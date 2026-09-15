@@ -6,6 +6,7 @@
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1, 3, 8, 12; D1–D2       | Every deck count, 54-card deck identity/multiplicity, 100 points per deck, kitty/hand sizes, card conservation, alternating teams, counterclockwise dealer rotation.                             |
 | 5–6; D7                  | Every level and trump mode; level removal, category boundaries, adjacent effective powers, joker ordering, printed set identity.                                                                 |
+| 7.2–7.5; D11             | Legal suit/joker declarations, same-rank multiplicity overturning, first-round small-to-big joker takeover, mixed joker counts, and physical-card validation.                                    |
 | 5.4, 8.3, 9.1, 10        | Supplied adjacency examples, singles through five-of-a-kind, no wraparound, no equal-power tractors, no cross-suit structures, exact structure comparison before trump, earlier-play ties.       |
 | 4; D4–D5                 | Negative/zero scores, each side of every checkpoint, advancement beyond nominal totals, J barrier, reaching A, failed-gamble penalty direction.                                                  |
 | Private API projection   | Only the viewer's hand, supported settings, no additional command fields, no-store responses, malformed/oversized request rejection.                                                             |
@@ -15,7 +16,7 @@ Run `npm run check` and `npm run test:e2e`. Browser tests require Chromium or an
 
 ## Foundation validation results
 
-- 131 rules/API tests passed.
+- 137 rules/API tests passed.
 - Eight Playwright journeys passed across desktop Chrome and mobile Chrome emulation.
 - Formatting, ESLint, TypeScript checks, and both production builds passed.
 - Both container images built; the local stack became healthy. HTTP smoke checks verified the frontend and private preview responses for all four player counts through nginx.
