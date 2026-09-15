@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { BotMatchTable } from './BotMatch.js';
 import type { CSSProperties, FormEvent } from 'react';
 import {
   advanceLevel,
@@ -388,10 +389,11 @@ export function App() {
           </span>
         </a>
         <div className="header-right">
+          <a href="#bot-match">Play against bots</a>
           <a href="#field-notes">
             How it works <span aria-hidden="true">↗</span>
           </a>
-          <span className="preview-badge">Practice preview</span>
+          <span className="preview-badge">Solo play</span>
         </div>
       </header>
 
@@ -632,6 +634,7 @@ export function App() {
           </div>
         </div>
 
+        <BotMatchTable />
         <TrickDrills />
 
         <section className="field-notes" id="field-notes">

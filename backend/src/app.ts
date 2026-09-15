@@ -12,9 +12,14 @@ import {
 import { previewRequestSchema, previewResponseSchema } from '@tractor/protocol';
 import { registerPracticeRoutes } from './practice-routes.js';
 import { registerRoundRoutes } from './round-routes.js';
+import { registerBotRoutes } from './bot-routes.js';
 
 export function buildApp(
-  options: { logger?: boolean; pickIndex?: (maximum: number) => number } = {},
+  options: {
+    logger?: boolean;
+    pickIndex?: (maximum: number) => number;
+    now?: () => number;
+  } = {},
 ) {
   const app = Fastify({ logger: options.logger ?? false, bodyLimit: 4096 });
   const pickIndex = options.pickIndex ?? randomInt;
@@ -40,6 +45,7 @@ export function buildApp(
 
   registerPracticeRoutes(app);
   registerRoundRoutes(app);
+  registerBotRoutes(app, options);
 
   // Stateless practice deal, not a live match. No endpoint exposes the other hands.
   app.post('/api/practice-preview', async (request, reply) => {

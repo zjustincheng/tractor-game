@@ -4,9 +4,9 @@ A partnership card game for 4, 6, 8, or 10 players, built around the supplied ve
 
 ## Current milestone
 
-The foundation includes a browser practice table, a stateless practice-deal API, guided trick drills, and a pure TypeScript rules package. You can deal sample hands, change player count/level/trump, inspect homogeneous structures, explore scoring thresholds, submit card selections to server-validated follow/gamble positions, and exercise declaration/kitty transitions in the rules tests.
+You can play a complete solo match against bots with 4, 6, 8, or 10 seats: declare trump, exchange the kitty, play tricks, settle each round, and advance through the J checkpoint to A. The backend validates every play. A sample-hand explorer and guided trick drills are also available.
 
-**This is not yet a playable multiplayer game.** Timed declaration, kitty exchange, complete follow/gamble decomposition, multi-trick state, full round settlement, rooms, and persistence are subsequent milestones in [ROADMAP.md](ROADMAP.md). The practice table lets you choose trump directly for exploration; it does not bypass declarations in a live match. Rule drills are fixed teaching positions, not multiplayer rooms.
+Bots use deterministic strategies with their own hands and public trick information: conserve strength behind winning partners, feed points when last to play, and choose cheap winning responses against opponents. They lead homogeneous structures and follow the existing structure/gamble rules; humans may attempt gambles. Cards are dealt instantly in solo mode, followed by the eight-second declaration window. Human multiplayer, timed dealing animation, durable saves, and deployment remain in [ROADMAP.md](ROADMAP.md).
 
 ## Run locally
 
@@ -18,6 +18,18 @@ npm run dev
 ```
 
 Open **http://127.0.0.1:3000**. The frontend proxies `/api` to the backend at `127.0.0.1:4000`. No database, account, or external credentials are required for this milestone.
+
+### Play against bots
+
+1. Click **Play against bots** in the header, choose the table size, and click **Start bot match**.
+2. Declare if you can overturn the current declaration. After the countdown, click **Finalize trump**.
+3. If you are dealer, select the required cards and click **Bury selected cards**.
+4. Select cards and click **Play cards**. **Suggest cards** selects a legal response for you to review.
+5. Use **Next trick** to continue, then **Start next round** after settlement. The first team to reach A wins.
+
+You are seat 1 on team A; all remaining seats are bots. **Resume bot match** restores the current server session after a browser refresh. Sessions expire after six hours of inactivity or a backend restart; restarting the development backend also clears matches.
+
+Trump cards are marked in your hand. Selection feedback explains follow obligations and whether a legal selection can compete for the trick; it does not predict unseen cards. The table shows captured points, penalty adjustments, current trick points, and the current winner. Failed-gamble explanations remain visible after the bots finish responding.
 
 | Command              | Purpose                                                                       |
 | -------------------- | ----------------------------------------------------------------------------- |
@@ -31,6 +43,8 @@ Open **http://127.0.0.1:3000**. The frontend proxies `/api` to the backend at `1
 | `npm run format`     | Format source and docs; preserves the existing `AGENTS.md`.                   |
 
 Install the browser once with `npx playwright install chromium`. Alternatively, use `PLAYWRIGHT_CHANNEL=chrome npm run test:e2e` with locally installed Chrome. Stop development servers before browser tests so their ports are available.
+
+To test alongside running dev servers: `E2E_WEB_PORT=3100 E2E_API_PORT=4100 PLAYWRIGHT_CHANNEL=chrome npm run test:e2e`.
 
 ## Repository layout
 
@@ -48,6 +62,9 @@ Colocate rules/API tests as `*.test.ts`; browser tests use `*.spec.ts`. Use stri
 ## API and configuration
 
 - `GET /api/health`: process health and rules version.
+- `POST /api/bot-matches`: `{ "playerCount": 4 }`; creates a solo match.
+- `GET /api/bot-matches/:id`: returns the human hand, public table, legal declaration options, and suggested cards.
+- `POST /api/bot-matches/:id/commands`: `{ "action": "play", "cardIds": ["..."], "revision": 3 }`; actions are `declare`, `bury`, `play`, `advance`, and `next-round`. Stale revisions return 409; rejected moves preserve state.
 - `GET /api/config`: supported table sizes, thresholds, and implemented capabilities.
 - `POST /api/practice-preview`: `{ "playerCount": 4, "level": "2", "trumpSuit": "spades" }`. Use `null` for no-suit trump. Returns seat 0's hand, public seat counts, and kitty count; never other hands or buried cards. Preview IDs are informational, not resumable sessions.
 - `GET /api/practice-tricks`: list fixed rule drills.

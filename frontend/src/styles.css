@@ -1021,3 +1021,123 @@ input[type='range'] {
     height: 64px;
   }
 }
+
+.bot-match {
+  margin: 2rem 0;
+  padding: clamp(1rem, 3vw, 2rem);
+  border: 1px solid #c8c5b7;
+  border-radius: 18px;
+  background: #faf8ef;
+  color: #203b31;
+}
+.bot-header,
+.bot-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+.bot-header {
+  justify-content: space-between;
+}
+.bot-match button,
+.bot-match select {
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid #7c9184;
+  background: white;
+  color: #203b31;
+  cursor: pointer;
+  font: inherit;
+}
+.bot-match button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.bot-match button:focus-visible {
+  outline: 3px solid #b37c19;
+  outline-offset: 3px;
+}
+.bot-scoreboard,
+.bot-seats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin: 1rem 0;
+}
+.bot-scoreboard {
+  padding: 1rem;
+  background: #e8ece0;
+  border-radius: 12px;
+}
+.bot-seat {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.7rem;
+  border: 1px solid #bcc8b9;
+  border-radius: 8px;
+}
+.bot-seat.active {
+  background: #daeac7;
+  border-color: #376647;
+}
+.bot-hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 1rem 0;
+}
+.bot-match .bot-card {
+  min-width: 54px;
+  min-height: 75px;
+  font-weight: 700;
+}
+.bot-match .bot-card.red {
+  color: #b13b36;
+}
+.bot-match .bot-card[aria-pressed='true'] {
+  background: #dcecc6;
+  outline: 3px solid #467746;
+}
+.bot-trick {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+.bot-play {
+  padding: 0.7rem;
+  border-radius: 10px;
+  background: #e9e7dd;
+}
+.bot-played-card {
+  display: inline-block;
+  padding: 0.4rem;
+  margin: 0.2rem;
+  background: white;
+  border-radius: 4px;
+}
+.bot-result {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #e1ebd7;
+  border-radius: 12px;
+}
+.bot-error {
+  color: #a22923;
+}
+
+.bot-match .bot-card.is-trump {
+  border-bottom: 4px solid #aa741b;
+}
+.bot-trump-label {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: #74531e;
+}
+.bot-score-detail {
+  font-size: 0.9rem;
+  color: #496155;
+}

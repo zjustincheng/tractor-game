@@ -108,6 +108,7 @@ export function settleRound(input: RoundSettlementInput): RoundSettlement {
     input.finalTrickWinnerTeam === defenderTeam &&
     input.levels[input.attackingTeam] === 'J' &&
     defenderScore >= gameConfig(input.playerCount).swapThreshold &&
+    input.finalWinningStructure?.cardCount === input.finalWinningCards.length &&
     isJackOnly(input.finalWinningCards, input.levels[input.attackingTeam]) &&
     !input.finalWinningCards.some((card) => card.kind === 'joker');
   if (jackReset) nextLevels[input.attackingTeam] = '2';

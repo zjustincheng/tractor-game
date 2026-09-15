@@ -4,7 +4,7 @@
 
 Build a browser-based, server-authoritative multiplayer implementation of Tractor (升级 / 拖拉机), based on the supplied version 2.1 specification. Support private matches with 4, 6, 8, and 10 human players, alternating teams, full declaration and gamble rules, persistent matches, and reconnecting players.
 
-The repository now has a foundation implementation: a React practice table, a stateless Fastify preview API, shared TypeScript rules and schemas, automated tests, and local container configuration. Live matches are not implemented yet. Bots, matchmaking, spectators, chat, and alternative rules are outside the initial release.
+The repository includes playable solo bot matches, a React practice table, a Fastify API, shared TypeScript rules and schemas, automated tests, and local container configuration. Basic bots were added as a playable testing milestone. Human multiplayer, matchmaking, spectators, chat, and alternative rules remain future work.
 
 ### Implementation Progress
 
@@ -19,7 +19,10 @@ The repository now has a foundation implementation: a React practice table, a st
 - [x] Rules/API tests, guided trick drills, and desktop/mobile browser journeys.
 - [x] Local frontend/backend containers and an optional PostgreSQL service for later persistence.
 - [~] Authoritative match state machine, declaration/kitty transitions, injected timestamps, and replay-ready pure state helpers; command/event persistence remains.
-- [~] Follow/gamble engine exercised in fixed drills; complete match integration, declarations, kitty exchange, and round settlement remain.
+- [x] Solo bot matches: declaration, kitty exchange, successive tricks, round settlement, dealer rotation, J checkpoint, and victory at A.
+- [x] Browser match controls, legal-play suggestions, completed-trick review, and in-memory session resume.
+- [x] Partner-aware tactical follows, point feeding when last to play, trump markers, selection validation, and visible score breakdowns.
+- [ ] Stronger bot tactics, deliberate bot gambles, timed dealing animation, and durable match saves.
 - [ ] Live rooms, reconnect, durable event/state persistence, and production deployment.
 
 See [README.md](README.md) for commands and [docs/testing.md](docs/testing.md) for the exact coverage boundary. These checks represent foundation progress, not completion of the full game.

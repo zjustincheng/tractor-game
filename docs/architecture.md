@@ -1,4 +1,4 @@
-# Foundation Architecture
+# Game Architecture
 
 ## Boundaries
 
@@ -13,6 +13,14 @@ flowchart LR
 ```
 
 The backend creates each practice shoe, shuffles with `crypto.randomInt`, partitions it, and returns only the viewer's hand. No full-shoe or opponent-hand endpoint exists. Practice previews are discarded after the response and are not matches. The browser's structure preview is advisory; future live commands must be validated by the server against authoritative state.
+
+## Solo bot matches
+
+`backend/src/bot-match.ts` connects declaration, kitty exchange, trick progression, and settlement. Injected time and shuffle choices make full matches reproducible in tests. Bots receive only their own hand, trump, and public lead components when choosing plays. Every bot and human move passes through `playCards`.
+
+`bot-routes.ts` keeps sessions per application instance and projects only the human's hand, public declarations/plays/counts, and dealer-visible kitty cards. Random session IDs act as local practice tokens. Commands include a revision to reject stale or duplicate submissions. Failed commands leave the stored match unchanged. A six-hour idle expiry and 200-session cap bound storage; this is single-process memory, without durable persistence or human multiplayer authentication.
+
+The browser stores the session ID for explicit resume after refresh. It pauses after completed tricks and settlements so users can review results. Dealing is immediate; server timestamps enforce declaration windows, and the user advances expired windows. Existing Vite/nginx proxy routes serve these endpoints without new infrastructure dependencies.
 
 ## Determinism
 

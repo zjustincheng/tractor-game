@@ -11,6 +11,26 @@ function card(
 }
 
 describe('round settlement', () => {
+  it('does not reset J for an all-Jack gamble of equal-power off-suit singles', () => {
+    const cards: Card[] = [
+      card('J', 'clubs'),
+      { id: 'jh', kind: 'suited', rank: 'J', suit: 'hearts' },
+    ];
+    const result = settleRound({
+      playerCount: 4,
+      attackingTeam: 'A',
+      levels: { A: 'J', B: '2' },
+      trickPoints: 80,
+      finalTrickWinnerTeam: 'B',
+      finalWinningCards: cards,
+      finalWinningStructure: homogeneousStructure([cards[0]!], {
+        level: 'J',
+        suit: 'spades',
+      }),
+      kitty: [],
+    });
+    expect(result.jackReset).toBe(false);
+  });
   it('multiplies kitty points by the actual final winning structure', () => {
     const structure = homogeneousStructure(
       [

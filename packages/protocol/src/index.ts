@@ -147,3 +147,51 @@ export const practiceRoundKittySchema = z.strictObject({
   buriedIds: z.array(z.string().min(1).max(100)).min(1).max(10),
 });
 export type PracticeRoundCreate = z.infer<typeof practiceRoundCreateSchema>;
+
+export const botCommandSchema = z.strictObject({
+  action: z.enum(['declare', 'bury', 'play', 'advance', 'next-round']),
+  cardIds: z.array(z.string().min(1).max(100)).max(36).optional(),
+});
+export const botMatchViewSchema = z.strictObject({
+  capturedPoints: z.number().int().nonnegative(),
+  penaltyPoints: z.number().int(),
+  trickPoints: z.number().int().nonnegative(),
+  trickPenalty: z.number().int(),
+  id: z.string().uuid(),
+  revision: z.number().int(),
+  playerCount: previewRequestSchema.shape.playerCount,
+  phase: practiceRoundViewSchema.shape.phase,
+  round: z.number().int(),
+  trickNumber: z.number().int(),
+  levels: practiceRoundViewSchema.shape.levels,
+  attackingTeam: z.enum(['A', 'B']),
+  dealerSeat: z.number().int(),
+  defenderScore: z.number().int(),
+  declarationDeadline: z.number().int(),
+  declaration: declarationViewSchema
+    .extend({ playerSeat: z.number().int() })
+    .nullable(),
+  declarationOptions: z.array(declarationViewSchema),
+  trump: practiceRoundViewSchema.shape.trump,
+  hand: z.array(cardSchema),
+  kittyCount: z.number().int(),
+  seats: previewResponseSchema.shape.seats,
+  plays: exerciseViewSchema.shape.plays,
+  nextSeat: z.number().int().nullable(),
+  trickComplete: z.boolean(),
+  winnerSeat: z.number().int().nullable(),
+  suggestion: z.array(z.string()),
+  message: z.string(),
+  settlement: z
+    .strictObject({
+      defenderScore: z.number().int(),
+      kittyPoints: z.number().int(),
+      kittyMultiplier: z.number().int(),
+      levels: practiceRoundViewSchema.shape.levels,
+      attackingTeam: z.enum(['A', 'B']),
+      jackReset: z.boolean(),
+      winner: z.enum(['A', 'B']).nullable(),
+    })
+    .nullable(),
+});
+export type BotMatchView = z.infer<typeof botMatchViewSchema>;
