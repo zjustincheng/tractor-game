@@ -6,7 +6,7 @@ A partnership card game for 4, 6, 8, or 10 players, built around the supplied ve
 
 You can play a complete solo match against bots with 4, 6, 8, or 10 seats: declare trump, exchange the kitty, play tricks, settle each round, and advance through the J checkpoint to A. The backend validates every play. A sample-hand explorer and guided trick drills are also available.
 
-Bots use deterministic strategies with their own hands and public trick information: conserve strength behind winning partners, feed points when last to play, and choose cheap winning responses against opponents. They lead homogeneous structures and follow the existing structure/gamble rules; humans may attempt gambles. Cards are dealt instantly in solo mode, followed by the eight-second declaration window. Human multiplayer, timed dealing animation, and deployment remain in [ROADMAP.md](ROADMAP.md).
+Bots use deterministic strategies with their own hands and public trick information: conserve strength behind winning partners, feed points when last to play, choose cheap winning responses against opponents, and adjust leads based on attacker/defender role and threshold pressure. They lead homogeneous structures and follow the existing structure/gamble rules; humans may attempt gambles. Cards are dealt instantly in solo mode, followed by the eight-second declaration window. Human multiplayer, timed dealing animation, and deployment remain in [ROADMAP.md](ROADMAP.md).
 
 ## Run locally
 

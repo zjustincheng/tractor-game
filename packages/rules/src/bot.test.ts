@@ -3,6 +3,7 @@ import {
   availableComponents,
   category,
   chooseBotPlay,
+  chooseBotLead,
   createDeck,
   deal,
   decomposeLead,
@@ -35,6 +36,29 @@ function select(
 }
 
 describe('bot follow selection', () => {
+  it('leads a strong structure for attackers and points near the defender threshold', () => {
+    const hand: Card[] = [
+      card('3', 'clubs', '3c'),
+      card('3', 'clubs', '3c2'),
+      card('4', 'clubs', '4c'),
+      card('4', 'clubs', '4c2'),
+      card('K', 'hearts', 'kh'),
+    ];
+    expect(
+      chooseBotLead(hand, trump, {
+        role: 'attackers',
+        defenderScore: 0,
+        swapThreshold: 80,
+      }),
+    ).toEqual(['3c', '3c2', '4c', '4c2']);
+    expect(
+      chooseBotLead(hand, trump, {
+        role: 'defenders',
+        defenderScore: 70,
+        swapThreshold: 80,
+      }),
+    ).toEqual(['kh']);
+  });
   it('beats an opponent with the cheapest winning single', () => {
     expect(
       select([card('3'), card('10'), card('K'), card('A')], [card('9')], false),

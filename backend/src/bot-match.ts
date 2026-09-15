@@ -2,6 +2,7 @@ import {
   advanceDeclaration,
   canOverturn,
   chooseBotBurial,
+  chooseBotLead,
   chooseBotPlay,
   compareComponents,
   createDeck,
@@ -137,24 +138,29 @@ function runBots(match: BotMatch): BotMatch {
   ) {
     const seat = trick.nextSeat!;
     const winnerSeat = trick.winnerSeat;
-    const result = playCards(
-      trick,
-      seat,
-      chooseBotPlay(
-        trick.hands[seat]!,
-        trick.plays[0]?.components ?? null,
-        trick.trump,
-        trick.winnerSeat === null
-          ? undefined
-          : {
-              seat,
-              winnerSeat: trick.winnerSeat,
-              winning: trick.plays.find((play) => play.seat === winnerSeat)!
-                .components!,
-              lastToPlay: trick.plays.length === trick.playerCount - 1,
-            },
-      ),
-    );
+    const cards =
+      trick.plays.length === 0
+        ? chooseBotLead(trick.hands[seat]!, trick.trump, {
+            role:
+              teamAt(seat) === trick.attackingTeam ? 'attackers' : 'defenders',
+            defenderScore: state.defenderScore,
+            swapThreshold: trick.playerCount * 20,
+          })
+        : chooseBotPlay(
+            trick.hands[seat]!,
+            trick.plays[0]!.components,
+            trick.trump,
+            trick.winnerSeat === null
+              ? undefined
+              : {
+                  seat,
+                  winnerSeat: trick.winnerSeat,
+                  winning: trick.plays.find((play) => play.seat === winnerSeat)!
+                    .components!,
+                  lastToPlay: trick.plays.length === trick.playerCount - 1,
+                },
+          );
+    const result = playCards(trick, seat, cards);
     if (!result.ok) throw new Error(result.message);
     trick = result.state;
   }

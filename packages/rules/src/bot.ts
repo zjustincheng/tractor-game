@@ -17,6 +17,51 @@ export interface BotPlayContext {
   lastToPlay: boolean;
 }
 
+export interface BotLeadContext {
+  role: 'attackers' | 'defenders';
+  defenderScore: number;
+  swapThreshold: number;
+}
+
+/** Choose a deterministic lead using basic score and structure priorities. */
+export function chooseBotLead(
+  hand: readonly Card[],
+  trump: Trump,
+  context: BotLeadContext,
+): string[] {
+  const candidates = availableComponents(hand, trump);
+  if (!candidates.length) throw new Error('A bot lead requires cards.');
+  const nearThreshold = context.defenderScore >= context.swapThreshold - 20;
+  const ranked = candidates.map((component) => {
+    const points = component.cards.reduce(
+      (sum, card) => sum + cardPoints(card),
+      0,
+    );
+    const structureBonus =
+      component.rankCount > 1 ? 25 + component.cardCount * 2 : 0;
+    const trumpBonus = component.category === 'trump' ? 15 : 0;
+    const score =
+      context.role === 'attackers'
+        ? structureBonus + trumpBonus - points
+        : nearThreshold
+          ? points * 10 + structureBonus + trumpBonus
+          : structureBonus + trumpBonus - points;
+    return { component, score };
+  });
+  ranked.sort(
+    (a, b) =>
+      b.score - a.score ||
+      b.component.cardCount - a.component.cardCount ||
+      b.component.multiplicity - a.component.multiplicity ||
+      b.component.highestPower - a.component.highestPower ||
+      a.component.cards
+        .map((card) => card.id)
+        .join('|')
+        .localeCompare(b.component.cards.map((card) => card.id).join('|')),
+  );
+  return ranked[0]!.component.cards.map((card) => card.id);
+}
+
 /** Uses only the bot's hand, public lead, and trump; never opponents' hands. */
 export function chooseBotPlay(
   hand: readonly Card[],
