@@ -57,6 +57,16 @@ test('plays a bot round, resumes it, and advances to the next round', async ({
     table.getByText('Round 1 · Trick 1', { exact: true }),
   ).toBeVisible();
   await expect(
+    table.getByRole('heading', { name: 'Play a match against bots' }),
+  ).toBeVisible();
+  await expect(
+    table.getByText('Team A · You + Seat 3', { exact: true }),
+  ).toBeVisible();
+  await expect(table.getByText('Your level', { exact: true })).toBeVisible();
+  await expect(
+    table.getByText('Opponents · Team B', { exact: true }),
+  ).toBeVisible();
+  await expect(
     table.getByRole('button', { name: 'Finalize trump' }),
   ).toBeEnabled({ timeout: 12000 });
   await table.getByRole('button', { name: 'Finalize trump' }).click();

@@ -148,6 +148,12 @@ export function BotMatchTable() {
   });
   const canPlay = view?.phase === 'tricks' && view.nextSeat === 0;
   const canBury = view?.phase === 'kitty' && view.dealerSeat === 0;
+  const teammateSeat = view ? 2 % view.playerCount : 2;
+  const yourRole = view
+    ? view.attackingTeam === 'A'
+      ? 'Attackers'
+      : 'Defenders'
+    : '';
   const selectedCards = hand.filter((card) => selected.includes(card.id));
   const selectedPoints = selectedCards.reduce(
     (sum, card) => sum + cardPoints(card),
@@ -280,6 +286,41 @@ export function BotMatchTable() {
             </span>
           </div>
           <p role="status">{view.message}</p>
+          <div
+            className="match-identity"
+            aria-label="Match identity and levels"
+          >
+            <div className="identity-card identity-you">
+              <span className="identity-label">Your team</span>
+              <strong>Team A · You + Seat {teammateSeat + 1}</strong>
+              <span className="identity-note">Your teammate</span>
+            </div>
+            <div className="identity-card identity-level">
+              <span className="identity-label">Your level</span>
+              <strong>{view.levels.A}</strong>
+              <span className="identity-note">First to A wins</span>
+            </div>
+            <div className="identity-card identity-role">
+              <span className="identity-label">This round</span>
+              <strong>{yourRole}</strong>
+              <span className="identity-note">
+                {view.attackingTeam === 'A'
+                  ? 'Protect the score'
+                  : 'Capture points'}
+              </span>
+            </div>
+            <div className="identity-card identity-opponents">
+              <span className="identity-label">Opponents · Team B</span>
+              <strong>Level {view.levels.B}</strong>
+              <span className="identity-note">
+                Seats{' '}
+                {Array.from(
+                  { length: view.playerCount / 2 },
+                  (_, i) => i * 2 + 2,
+                ).join(', ')}
+              </span>
+            </div>
+          </div>
           {!animating && (
             <p className="bot-score-detail">
               Defender score: {view.capturedPoints} captured +{' '}

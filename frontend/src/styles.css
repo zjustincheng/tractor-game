@@ -1141,6 +1141,60 @@ input[type='range'] {
   font-size: 0.9rem;
   color: #496155;
 }
+.match-identity {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1.4fr) repeat(3, minmax(8rem, 1fr));
+  gap: 0.65rem;
+  margin: 1rem 0;
+}
+.identity-card {
+  display: grid;
+  gap: 0.3rem;
+  min-height: 5.7rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid #c2ccbd;
+  border-radius: 10px;
+  background: #f3f4ea;
+}
+.identity-card strong {
+  font-size: 1.18rem;
+  line-height: 1.15;
+}
+.identity-label {
+  color: #617168;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.identity-note {
+  color: #69786e;
+  font-size: 0.78rem;
+}
+.identity-you {
+  border-color: #477352;
+  background: #e6efdc;
+}
+.identity-level {
+  border-color: #b08a38;
+  background: #f7efd5;
+}
+.identity-level strong {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 2rem;
+  color: #765817;
+}
+.identity-role strong {
+  color: #285c45;
+}
+.identity-opponents {
+  background: #eeefea;
+}
+@media (max-width: 760px) {
+  .match-identity {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 
 .bot-history {
   margin-top: 1rem;
