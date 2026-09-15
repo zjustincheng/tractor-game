@@ -19,7 +19,6 @@ import {
   practiceRoundViewSchema,
 } from '@tractor/protocol';
 
-const rounds = new Map<string, MatchState>();
 function declarationView(declaration: Declaration) {
   return {
     kind: declaration.kind,
@@ -64,7 +63,13 @@ function view(id: string, state: MatchState) {
   });
 }
 
-export function registerRoundRoutes(app: FastifyInstance) {
+export function registerRoundRoutes(
+  app: FastifyInstance,
+  options: { pickIndex?: (max: number) => number; now?: () => number } = {},
+) {
+  const rounds = new Map<string, MatchState>();
+  const pick = options.pickIndex ?? randomInt;
+  const clock = options.now ?? Date.now;
   app.post('/api/practice-rounds', async (request, reply) => {
     const parsed = practiceRoundCreateSchema.safeParse(request.body);
     if (!parsed.success)
@@ -73,12 +78,12 @@ export function registerRoundRoutes(app: FastifyInstance) {
         message: 'Choose a supported player count and team.',
       });
     const id = randomUUID();
-    const now = Date.now();
+    const now = clock();
     const state = createRound({
       playerCount: parsed.data.playerCount,
       dealerSeat: 0,
       attackingTeam: parsed.data.attackingTeam,
-      shoe: shuffle(createDeck(parsed.data.playerCount), randomInt),
+      shoe: shuffle(createDeck(parsed.data.playerCount), pick),
       firstDeclarationDeadline: now + 8000,
     });
     rounds.set(id, state);
@@ -126,7 +131,7 @@ export function registerRoundRoutes(app: FastifyInstance) {
           code: 'INVALID_DECLARATION',
           message: 'That declaration is not legal from your hand.',
         });
-      const result = receiveDeclaration(state, 0, declaration, Date.now());
+      const result = receiveDeclaration(state, 0, declaration, clock());
       if (!result.ok)
         return reply
           .code(422)
@@ -144,7 +149,7 @@ export function registerRoundRoutes(app: FastifyInstance) {
           code: 'ROUND_NOT_FOUND',
           message: 'That practice round has expired.',
         });
-      const result = advanceDeclaration(state, Date.now(), randomInt);
+      const result = advanceDeclaration(state, clock(), pick);
       if (!result.ok)
         return reply
           .code(409)

@@ -19,14 +19,14 @@ Run `npm run check` and `npm run test:e2e`. Browser tests require Chromium or an
 
 ## Foundation validation results
 
-- 166 rules/API tests passed, including four complete matches, generated tactical follow positions, partner support, cheap winning responses, and failed-gamble feedback.
-- Ten Playwright journeys passed across desktop Chrome and mobile Chrome emulation. Bot journeys play an entire round, resume after refresh, and start round two.
+- 170 rules/API tests passed, including four complete matches, tactical follows, failed-gamble feedback, snapshot restart recovery, failed writes, corrupt files, and expiry.
+- Twelve Playwright journeys passed across desktop Chrome and mobile Chrome emulation. Bot journeys cover paced turns, pause/skip controls, a complete round, history, resume after refresh, and starting round two.
 - Formatting, ESLint, TypeScript checks, and both production builds passed.
 - Both container images built; the local stack became healthy. HTTP smoke checks verified the frontend and private preview responses for all four player counts through nginx.
 - Desktop/mobile ten-player screenshots were inspected. The optional PostgreSQL profile and remote CI execution have not been exercised.
 
 ## Not implemented yet
 
-Solo matches run the existing follow/gamble engine across successive tricks and rounds. They do not implement physical timed dealing animation, strong tactical bots, deliberate bot gamble leads, human multiplayer rooms, or durable saves. Session resume works only while the same backend process retains the match. Full-match simulations use legal bot suggestions for the human seat; they do not exhaust every possible human gamble or rule combination. Remaining rule decisions in the decision log still need concrete examples.
+Solo matches run the existing follow/gamble engine across successive tricks and rounds. They do not implement physical timed dealing animation, strong tactical bots, deliberate bot gamble leads, human multiplayer rooms, or multi-process storage. Saved snapshots restore across server restarts; tests exercise graceful application restarts and failed writes, not physical power loss. Full-match simulations use legal bot suggestions for the human seat; they do not exhaust every possible human gamble or rule combination. Remaining rule decisions in the decision log still need concrete examples.
 
 Container configuration can be checked with `docker compose -f infrastructure/compose.yaml config --quiet`; a running Docker daemon is required to build and smoke-test images. CI runs code checks and browser tests, but production deployment verification belongs to a later milestone.

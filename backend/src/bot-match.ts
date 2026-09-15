@@ -22,9 +22,24 @@ import type {
   MatchState,
   PlayerCount,
   RoundSettlement,
+  TrickPlay,
+  Trump,
 } from '@tractor/rules';
 
+export interface CompletedTrick {
+  round: number;
+  number: number;
+  trump: Trump;
+  winnerSeat: number;
+  points: number;
+  defenderPoints: number;
+  penalty: number;
+  plays: readonly Pick<TrickPlay, 'seat' | 'cards' | 'matchesLead'>[];
+}
+
 export interface BotMatch {
+  history: CompletedTrick[];
+  rounds: { round: number; settlement: RoundSettlement }[];
   state: MatchState;
   captured: number;
   penalties: number;
@@ -88,6 +103,8 @@ export function newBotMatch(
     firstDeclarationDeadline: now + 8000,
   });
   return {
+    history: [],
+    rounds: [],
     state: botDeclarations(state, now),
     captured: 0,
     penalties: 0,
@@ -152,6 +169,23 @@ function runBots(match: BotMatch): BotMatch {
       captured,
       penalties,
       state,
+      history: [
+        ...match.history,
+        {
+          round: state.round,
+          number: match.trickNumber,
+          trump: state.trump!,
+          winnerSeat: trick.winnerSeat!,
+          points: trick.trickPoints,
+          defenderPoints: trick.capturedDefenderPoints,
+          penalty: trick.penaltyPoints,
+          plays: trick.plays.map(({ seat, cards, matchesLead }) => ({
+            seat,
+            cards,
+            matchesLead,
+          })),
+        },
+      ].slice(-100),
       message: `${match.message.startsWith('Gamble failed;') ? match.message + ' ' : ''}Seat ${trick.winnerSeat! + 1} won trick ${match.trickNumber} (${trick.trickPoints} points).`,
     };
     if (trick.hands.every((hand) => hand.length === 0)) {
@@ -178,6 +212,9 @@ function runBots(match: BotMatch): BotMatch {
           defenderScore: settlement.defenderScore,
         },
         settlement,
+        rounds: [...match.rounds, { round: state.round, settlement }].slice(
+          -20,
+        ),
         message: settlement.winner
           ? `Team ${settlement.winner} wins the match!`
           : `Round ${state.round} complete.`,
@@ -259,6 +296,8 @@ export function commandBotMatch(
       firstDeclarationDeadline: now + 8000,
     });
     return {
+      history: match.history,
+      rounds: match.rounds,
       state: botDeclarations(state, now),
       captured: 0,
       penalties: 0,

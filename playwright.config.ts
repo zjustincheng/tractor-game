@@ -23,7 +23,7 @@ export default defineConfig({
   webServer: [
     {
       command: 'npm run dev -w backend',
-      env: { PORT: String(apiPort) },
+      env: { PORT: String(apiPort), BOT_MATCH_DIR: ':memory:' },
       url: `http://127.0.0.1:${apiPort}/api/health`,
       reuseExistingServer: false,
       timeout: 30000,

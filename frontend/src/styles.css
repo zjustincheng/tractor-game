@@ -1141,3 +1141,36 @@ input[type='range'] {
   font-size: 0.9rem;
   color: #496155;
 }
+
+.bot-history {
+  margin-top: 1rem;
+  padding: 0.85rem;
+  border: 1px solid #bfcabd;
+  border-radius: 8px;
+}
+.bot-history summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.bot-history details {
+  padding: 0.7rem 0;
+  border-top: 1px solid #d3dace;
+}
+.bot-play {
+  animation: bot-play-enter 0.2s ease-out;
+}
+@keyframes bot-play-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bot-play {
+    animation: none;
+  }
+}

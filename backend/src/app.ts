@@ -19,6 +19,7 @@ export function buildApp(
     logger?: boolean;
     pickIndex?: (maximum: number) => number;
     now?: () => number;
+    saveDirectory?: string;
   } = {},
 ) {
   const app = Fastify({ logger: options.logger ?? false, bodyLimit: 4096 });
@@ -44,7 +45,7 @@ export function buildApp(
   }));
 
   registerPracticeRoutes(app);
-  registerRoundRoutes(app);
+  registerRoundRoutes(app, options);
   registerBotRoutes(app, options);
 
   // Stateless practice deal, not a live match. No endpoint exposes the other hands.

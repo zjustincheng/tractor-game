@@ -6,7 +6,7 @@ A partnership card game for 4, 6, 8, or 10 players, built around the supplied ve
 
 You can play a complete solo match against bots with 4, 6, 8, or 10 seats: declare trump, exchange the kitty, play tricks, settle each round, and advance through the J checkpoint to A. The backend validates every play. A sample-hand explorer and guided trick drills are also available.
 
-Bots use deterministic strategies with their own hands and public trick information: conserve strength behind winning partners, feed points when last to play, and choose cheap winning responses against opponents. They lead homogeneous structures and follow the existing structure/gamble rules; humans may attempt gambles. Cards are dealt instantly in solo mode, followed by the eight-second declaration window. Human multiplayer, timed dealing animation, durable saves, and deployment remain in [ROADMAP.md](ROADMAP.md).
+Bots use deterministic strategies with their own hands and public trick information: conserve strength behind winning partners, feed points when last to play, and choose cheap winning responses against opponents. They lead homogeneous structures and follow the existing structure/gamble rules; humans may attempt gambles. Cards are dealt instantly in solo mode, followed by the eight-second declaration window. Human multiplayer, timed dealing animation, and deployment remain in [ROADMAP.md](ROADMAP.md).
 
 ## Run locally
 
@@ -27,7 +27,15 @@ Open **http://127.0.0.1:3000**. The frontend proxies `/api` to the backend at `1
 4. Select cards and click **Play cards**. **Suggest cards** selects a legal response for you to review.
 5. Use **Next trick** to continue, then **Start next round** after settlement. The first team to reach A wins.
 
-You are seat 1 on team A; all remaining seats are bots. **Resume bot match** restores the current server session after a browser refresh. Sessions expire after six hours of inactivity or a backend restart; restarting the development backend also clears matches.
+You are seat 1 on team A; all remaining seats are bots. Choose **Bot pace** to reveal turns at your preferred speed, pause them, or show the remaining plays immediately. **Trick history** retains the most recent 100 tricks; **Round history** retains the most recent 20 round results.
+
+**Resume bot match** restores your saved match after a browser refresh or server restart. Matches expire after 30 days of inactivity. The browser remembers the match ID; use the same browser profile to resume.
+
+### Saved matches
+
+The server saves accepted commands before responding. By default, snapshots live in `data/matches` relative to the backend's working directory (`backend/data/matches` with `npm run dev`). Set `BOT_MATCH_DIR` to an absolute path to choose another location, or `:memory:` for disposable sessions. Save files contain all private hands and must remain server-side. They are excluded from Git and container builds.
+
+Docker Compose uses the `bot-matches` volume, which survives container replacement. Back up the save directory or volume to retain matches elsewhere; deleting the volume deletes its saves. The file store supports one backend process per directory. Invalid saves cause a clear startup failure rather than being silently overwritten. This is snapshot recovery, not a complete event replay system.
 
 Trump cards are marked in your hand. Selection feedback explains follow obligations and whether a legal selection can compete for the trick; it does not predict unseen cards. The table shows captured points, penalty adjustments, current trick points, and the current winner. Failed-gamble explanations remain visible after the bots finish responding.
 

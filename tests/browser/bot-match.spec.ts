@@ -1,11 +1,55 @@
 import { expect, test } from '@playwright/test';
 
+test('pauses and skips paced bot turns without enabling human actions early', async ({
+  page,
+}) => {
+  test.setTimeout(45000);
+  await page.goto('/');
+  const table = page.locator('#bot-match');
+  await table.getByRole('combobox', { name: 'Bot pace' }).selectOption('1000');
+  await table
+    .getByRole('button', { name: 'Start bot match', exact: true })
+    .click();
+  const finalize = table.getByRole('button', { name: 'Finalize trump' });
+  await expect(finalize).toBeEnabled({ timeout: 12000 });
+  await Promise.all([
+    page.waitForResponse((response) => response.url().endsWith('/commands')),
+    finalize.click(),
+  ]);
+  const pause = table.getByRole('button', { name: 'Pause bot turns' });
+  for (let step = 0; step < 5 && !(await pause.isVisible()); step++) {
+    await table.getByRole('button', { name: 'Suggest cards' }).click();
+    const bury = table.getByRole('button', { name: 'Bury selected cards' });
+    const action = (await bury.isVisible())
+      ? bury
+      : table.getByRole('button', { name: 'Play cards', exact: true });
+    await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith('/commands')),
+      action.click(),
+    ]);
+  }
+  await pause.click();
+  const count = await table.locator('.bot-play').count();
+  await expect(
+    table.getByRole('button', { name: 'Refresh match' }),
+  ).toBeDisabled();
+  await page.waitForTimeout(1200);
+  expect(await table.locator('.bot-play').count()).toBe(count);
+  await table.getByRole('button', { name: 'Show remaining plays' }).click();
+  await expect(
+    table.getByRole('button', { name: 'Refresh match' }),
+  ).toBeEnabled();
+  expect(await table.locator('.bot-play').count()).toBeGreaterThan(count);
+  await expect(table.getByRole('alert')).toHaveCount(0);
+});
+
 test('plays a bot round, resumes it, and advances to the next round', async ({
   page,
 }) => {
   test.setTimeout(90000);
   await page.goto('/');
   const table = page.locator('#bot-match');
+  await table.getByRole('combobox', { name: 'Bot pace' }).selectOption('0');
   await table
     .getByRole('button', { name: 'Start bot match', exact: true })
     .click();
@@ -19,6 +63,7 @@ test('plays a bot round, resumes it, and advances to the next round', async ({
   await expect(table.locator('.bot-score-detail')).toContainText('captured +');
   // Resume uses the private session ID and server state, including a pending human decision.
   await page.reload();
+  await table.getByRole('combobox', { name: 'Bot pace' }).selectOption('0');
   await table.getByRole('button', { name: 'Resume bot match' }).click();
   await expect(
     table.getByText('Round 1 · Trick 1', { exact: true }),
@@ -52,6 +97,8 @@ test('plays a bot round, resumes it, and advances to the next round', async ({
   await expect(
     table.getByRole('heading', { name: 'Round 1 results' }),
   ).toBeVisible();
+  await table.getByText(/^Trick history \(/).click();
+  await expect(table.getByText(/Round 1 · Trick 1 — Seat/)).toBeVisible();
   await table.getByRole('button', { name: 'Start next round' }).click();
   await expect(
     table.getByText('Round 2 · Trick 1', { exact: true }),

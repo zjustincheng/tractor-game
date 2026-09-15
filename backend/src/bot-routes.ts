@@ -14,6 +14,7 @@ import {
   newBotMatch,
 } from './bot-match.js';
 import type { BotMatch } from './bot-match.js';
+import { MatchStore } from './match-store.js';
 
 function declarationView(item: Declaration) {
   return {
@@ -54,6 +55,13 @@ export function botView(id: string, match: BotMatch, revision: number) {
           )
         : [];
   return botMatchViewSchema.parse({
+    history: match.history,
+    rounds: match.rounds.map(({ round, settlement }) => ({
+      round,
+      defenderScore: settlement.defenderScore,
+      levels: settlement.levels,
+      winner: settlement.winner,
+    })),
     id,
     revision,
     playerCount: state.playerCount,
@@ -111,18 +119,21 @@ export function botView(id: string, match: BotMatch, revision: number) {
 
 export function registerBotRoutes(
   app: FastifyInstance,
-  options: { now?: () => number; pickIndex?: (max: number) => number } = {},
+  options: {
+    now?: () => number;
+    pickIndex?: (max: number) => number;
+    saveDirectory?: string;
+  } = {},
 ) {
   const now = options.now ?? Date.now;
   const pick = options.pickIndex ?? randomInt;
   // Random IDs act as private local practice-session tokens. No multiplayer identity is implied.
-  const sessions = new Map<
-    string,
-    { match: BotMatch; revision: number; touched: number }
-  >();
+  const sessions = new MatchStore(options.saveDirectory, (id, entry) => {
+    botView(id, entry.match, entry.revision);
+  });
   const expire = () => {
     for (const [id, entry] of sessions)
-      if (entry.touched < now() - 6 * 60 * 60 * 1000) sessions.delete(id);
+      if (entry.touched < now() - 30 * 24 * 60 * 60 * 1000) sessions.delete(id);
   };
   app.post('/api/bot-matches', async (request, reply) => {
     const parsed = practiceRoundCreateSchema.safeParse(request.body);
@@ -153,7 +164,7 @@ export function registerBotRoutes(
         return reply
           .code(404)
           .send({ message: 'This match expired. Start a new match.' });
-      entry.touched = now();
+      sessions.set(request.params.id, { ...entry, touched: now() });
       return botView(request.params.id, entry.match, entry.revision);
     },
   );

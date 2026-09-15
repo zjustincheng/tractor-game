@@ -19,10 +19,46 @@ function label(card: Card) {
 }
 
 export function BotMatchTable() {
-  const [view, setView] = useState<BotMatchView | null>(null);
+  const [snapshot, setView] = useState<BotMatchView | null>(null);
+  const [visiblePlays, setVisiblePlays] = useState(0);
+  const [pace, setPace] = useState(650);
+  const [paused, setPaused] = useState(false);
   const [count, setCount] = useState(4);
   const [selected, setSelected] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [pending, setBusy] = useState(false);
+  const animating = snapshot !== null && visiblePlays < snapshot.plays.length;
+  const busy = pending || animating;
+  const view: BotMatchView | null = !snapshot
+    ? null
+    : !animating
+      ? snapshot
+      : {
+          ...snapshot,
+          phase: snapshot.phase === 'finished' ? 'tricks' : snapshot.phase,
+          plays: snapshot.plays.slice(0, visiblePlays),
+          seats: snapshot.seats.map((seat) => ({
+            ...seat,
+            cardCount:
+              seat.cardCount +
+              snapshot.plays
+                .slice(visiblePlays)
+                .filter((play) => play.seat === seat.seat)
+                .reduce((sum, play) => sum + play.cards.length, 0),
+          })),
+          nextSeat: null,
+          winnerSeat: null,
+          trickComplete: false,
+          settlement: null,
+          history: snapshot.history.filter(
+            (item) =>
+              item.round !== snapshot.round ||
+              item.number !== snapshot.trickNumber,
+          ),
+          rounds: snapshot.rounds.filter(
+            (item) => item.round !== snapshot.round,
+          ),
+          message: `Bot ${snapshot.plays[visiblePlays]!.seat + 1} is playing…`,
+        };
   const [error, setError] = useState('');
   const [clock, setClock] = useState(Date.now());
   const [savedId, setSavedId] = useState(() =>
@@ -32,6 +68,17 @@ export function BotMatchTable() {
     const timer = window.setInterval(() => setClock(Date.now()), 250);
     return () => window.clearInterval(timer);
   }, []);
+  useEffect(() => {
+    if (!animating || paused) return;
+    const timer = window.setTimeout(
+      () =>
+        setVisiblePlays((count) =>
+          pace === 0 ? snapshot!.plays.length : count + 1,
+        ),
+      pace,
+    );
+    return () => window.clearTimeout(timer);
+  }, [animating, paused, pace, visiblePlays, snapshot]);
 
   async function request(path: string, body?: unknown) {
     setBusy(true);
@@ -55,6 +102,18 @@ export function BotMatchTable() {
             : 'Could not update the match.',
         );
       const next = botMatchViewSchema.parse(data);
+      const alreadyShown =
+        snapshot?.id === next.id &&
+        snapshot.round === next.round &&
+        snapshot.trickNumber === next.trickNumber
+          ? snapshot.plays.length
+          : 0;
+      const revealCount =
+        alreadyShown + (next.plays[alreadyShown]?.seat === 0 ? 1 : 0);
+      setVisiblePlays(
+        body === undefined || pace === 0 ? next.plays.length : revealCount,
+      );
+      setPaused(false);
       setView(next);
       setSelected([]);
       localStorage.setItem('tractor-bot-match', next.id);
@@ -162,6 +221,30 @@ export function BotMatchTable() {
           )}
         </div>
       </div>
+      <div className="bot-controls">
+        <label>
+          Bot pace{' '}
+          <select
+            value={pace}
+            onChange={(event) => setPace(Number(event.target.value))}
+          >
+            <option value={1000}>Relaxed</option>
+            <option value={650}>Normal</option>
+            <option value={200}>Fast</option>
+            <option value={0}>Instant</option>
+          </select>
+        </label>
+        {animating && (
+          <>
+            <button onClick={() => setPaused((value) => !value)}>
+              {paused ? 'Resume bot turns' : 'Pause bot turns'}
+            </button>
+            <button onClick={() => setVisiblePlays(snapshot!.plays.length)}>
+              Show remaining plays
+            </button>
+          </>
+        )}
+      </div>
       <p>
         Play with a bot partner and bot opponents. Select your cards, or use a
         suggested legal play. The first team to reach A wins.
@@ -185,7 +268,9 @@ export function BotMatchTable() {
               {view.dealerSeat + 1}
             </span>
             <span>
-              Defenders: {view.defenderScore} / {view.playerCount * 20} to swap
+              {animating
+                ? 'Trick in progress'
+                : `Defenders: ${view.defenderScore} / ${view.playerCount * 20} to swap`}
             </span>
             <span>
               Trump:{' '}
@@ -195,16 +280,18 @@ export function BotMatchTable() {
             </span>
           </div>
           <p role="status">{view.message}</p>
-          <p className="bot-score-detail">
-            Defender score: {view.capturedPoints} captured +{' '}
-            {view.penaltyPoints} penalties
-            {view.settlement ? ` + ${view.settlement.kittyPoints} kitty` : ''}.
-            Current trick: {view.trickPoints} points
-            {view.trickPenalty
-              ? `; penalty ${view.trickPenalty > 0 ? '+' : ''}${view.trickPenalty}`
-              : ''}
-            .
-          </p>
+          {!animating && (
+            <p className="bot-score-detail">
+              Defender score: {view.capturedPoints} captured +{' '}
+              {view.penaltyPoints} penalties
+              {view.settlement ? ` + ${view.settlement.kittyPoints} kitty` : ''}
+              . Current trick: {view.trickPoints} points
+              {view.trickPenalty
+                ? `; penalty ${view.trickPenalty > 0 ? '+' : ''}${view.trickPenalty}`
+                : ''}
+              .
+            </p>
+          )}
           <div className="bot-seats">
             {view.seats.map((seat) => (
               <div
@@ -393,6 +480,43 @@ export function BotMatchTable() {
                 </button>
               )}
             </div>
+          )}
+          <details className="bot-history">
+            <summary>Trick history ({view.history.length})</summary>
+            <p>Most recent 100 tricks. Only played cards are shown.</p>
+            {[...view.history].reverse().map((trick) => (
+              <details key={`${trick.round}-${trick.number}`}>
+                <summary>
+                  Round {trick.round} · Trick {trick.number} — Seat{' '}
+                  {trick.winnerSeat + 1} won {trick.points} points
+                </summary>
+                <p>
+                  Trump: {trick.trump.level} · {trick.trump.suit ?? 'No suit'}.
+                  Defenders captured {trick.defenderPoints}; penalty{' '}
+                  {trick.penalty}.
+                </p>
+                {trick.plays.map((play) => (
+                  <p key={play.seat}>
+                    <strong>Seat {play.seat + 1}: </strong>
+                    {play.cards.map(label).join(' · ')}
+                  </p>
+                ))}
+              </details>
+            ))}
+            {!view.history.length && <p>Completed tricks will appear here.</p>}
+          </details>
+          {view.rounds.length > 0 && (
+            <details className="bot-history">
+              <summary>Round history ({view.rounds.length})</summary>
+              <p>Most recent 20 rounds.</p>
+              {[...view.rounds].reverse().map((round) => (
+                <p key={round.round}>
+                  Round {round.round}: defenders {round.defenderScore} points.
+                  Levels A {round.levels.A} / B {round.levels.B}
+                  {round.winner ? ` · Team ${round.winner} won the match` : ''}.
+                </p>
+              ))}
+            </details>
           )}
         </>
       )}

@@ -20,9 +20,10 @@ The repository includes playable solo bot matches, a React practice table, a Fas
 - [x] Local frontend/backend containers and an optional PostgreSQL service for later persistence.
 - [~] Authoritative match state machine, declaration/kitty transitions, injected timestamps, and replay-ready pure state helpers; command/event persistence remains.
 - [x] Solo bot matches: declaration, kitty exchange, successive tricks, round settlement, dealer rotation, J checkpoint, and victory at A.
-- [x] Browser match controls, legal-play suggestions, completed-trick review, and in-memory session resume.
+- [x] Browser match controls, legal-play suggestions, completed-trick review, and session resume.
 - [x] Partner-aware tactical follows, point feeding when last to play, trump markers, selection validation, and visible score breakdowns.
-- [ ] Stronger bot tactics, deliberate bot gambles, timed dealing animation, and durable match saves.
+- [x] Paced bot-play reveals with pause/skip controls, recent trick and round history, durable single-server snapshots, and Docker save volume.
+- [ ] Stronger bot tactics, deliberate bot gambles, and timed dealing animation.
 - [ ] Live rooms, reconnect, durable event/state persistence, and production deployment.
 
 See [README.md](README.md) for commands and [docs/testing.md](docs/testing.md) for the exact coverage boundary. These checks represent foundation progress, not completion of the full game.

@@ -17,6 +17,8 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/backend/dist ./backend/dist
 COPY --from=build --chown=node:node /app/backend/package.json ./backend/package.json
+RUN mkdir -p /app/data/matches && chown -R node:node /app/data
+ENV BOT_MATCH_DIR=/app/data/matches
 USER node
 EXPOSE 4000
 CMD ["node", "backend/dist/server.js"]

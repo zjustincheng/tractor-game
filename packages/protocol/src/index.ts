@@ -153,6 +153,33 @@ export const botCommandSchema = z.strictObject({
   cardIds: z.array(z.string().min(1).max(100)).max(36).optional(),
 });
 export const botMatchViewSchema = z.strictObject({
+  history: z
+    .array(
+      z.strictObject({
+        round: z.number().int(),
+        number: z.number().int(),
+        trump: z.strictObject({
+          level: z.enum(RANKS),
+          suit: z.enum(SUITS).nullable(),
+        }),
+        winnerSeat: z.number().int(),
+        points: z.number().int(),
+        defenderPoints: z.number().int(),
+        penalty: z.number().int(),
+        plays: exerciseViewSchema.shape.plays,
+      }),
+    )
+    .max(100),
+  rounds: z
+    .array(
+      z.strictObject({
+        round: z.number().int(),
+        defenderScore: z.number().int(),
+        levels: practiceRoundViewSchema.shape.levels,
+        winner: z.enum(['A', 'B']).nullable(),
+      }),
+    )
+    .max(20),
   capturedPoints: z.number().int().nonnegative(),
   penaltyPoints: z.number().int(),
   trickPoints: z.number().int().nonnegative(),
