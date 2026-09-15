@@ -131,4 +131,38 @@ describe('practice API', () => {
     expect(accepted.json().accepted).toBe(true);
     expect(accepted.json().matchesLead).toBe(false);
   });
+
+  it('creates a private practice round with legal declaration options', async () => {
+    const server = app();
+    const created = await server.inject({
+      method: 'POST',
+      url: '/api/practice-rounds',
+      payload: { playerCount: 4, attackingTeam: 'A' },
+    });
+    expect(created.statusCode).toBe(200);
+    const view = created.json();
+    expect(view.phase).toBe('declaration');
+    expect(view.hand).toHaveLength(25);
+    expect(view.seats).toHaveLength(4);
+    expect(view.kittyCount).toBe(8);
+    expect(view.declarationOptions.length).toBeGreaterThan(0);
+    const id = view.id as string;
+    const option = view.declarationOptions[0];
+    const declared = await server.inject({
+      method: 'POST',
+      url: `/api/practice-rounds/${id}/declaration`,
+      payload: { cardIds: option.cardIds },
+    });
+    expect(declared.statusCode).toBe(200);
+    expect(declared.json().declaration).toMatchObject({
+      kind: option.kind,
+      multiplicity: option.multiplicity,
+    });
+    expect(declared.json().declarationDeadline).toBeGreaterThan(Date.now());
+    expect(declared.json().kittyCount).toBe(8);
+    expect(declared.json().hand).toHaveLength(25);
+    expect(
+      (await server.inject('/api/practice-rounds/missing')).statusCode,
+    ).toBe(404);
+  });
 });

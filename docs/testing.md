@@ -18,7 +18,7 @@ Run `npm run check` and `npm run test:e2e`. Browser tests require Chromium or an
 
 ## Foundation validation results
 
-- 146 rules/API tests passed.
+- 147 rules/API tests passed.
 - Eight Playwright journeys passed across desktop Chrome and mobile Chrome emulation.
 - Formatting, ESLint, TypeScript checks, and both production builds passed.
 - Both container images built; the local stack became healthy. HTTP smoke checks verified the frontend and private preview responses for all four player counts through nginx.
@@ -26,6 +26,6 @@ Run `npm run check` and `npm run test:e2e`. Browser tests require Chromium or an
 
 ## Not implemented yet
 
-The foundation does not claim coverage of physical timed dealing animation, complete live follow enforcement outside the guided positions (D6, D12), full gamble decomposition/comparison (D9–D10), round-to-round dealer persistence, room transport, reconnect, persistence, or complete match lifecycle. Declaration, kitty, and settlement transitions are pure state helpers; wire them to authenticated commands and durable events in the next milestone. The three-joker/four-joker and unresolved higher-multiplicity examples in the decision log remain requirements, not passing tests.
+The foundation does not claim coverage of physical timed dealing animation, complete live follow enforcement outside the guided positions (D6, D12), full gamble decomposition/comparison (D9–D10), round-to-round dealer persistence, room transport, reconnect, persistence, or complete match lifecycle. Declaration, kitty, settlement, and development practice-round transitions are pure or in-memory helpers; wire them to authenticated commands and durable events in the next milestone. The three-joker/four-joker and unresolved higher-multiplicity examples in the decision log remain requirements, not passing tests.
 
 Container configuration can be checked with `docker compose -f infrastructure/compose.yaml config --quiet`; a running Docker daemon is required to build and smoke-test images. CI runs code checks and browser tests, but production deployment verification belongs to a later milestone.

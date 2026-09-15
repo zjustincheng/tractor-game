@@ -53,6 +53,13 @@ Colocate rules/API tests as `*.test.ts`; browser tests use `*.spec.ts`. Use stri
 - `GET /api/practice-tricks`: list fixed rule drills.
 - `GET /api/practice-tricks/:id`: return one drill's authorized view.
 - `POST /api/practice-tricks/:id/attempt`: `{ "cardIds": ["..."] }`; validates the selection with the pure rules engine and returns a revised view or a stable error.
+- `POST /api/practice-rounds`: `{ "playerCount": 4, "attackingTeam": "A" }`; creates an in-memory round with a declaration window.
+- `GET /api/practice-rounds/:id`: returns the round phase, public counts, your hand, and legal declaration options.
+- `POST /api/practice-rounds/:id/declaration`: submits one of seat 0's legal level-card declarations.
+- `POST /api/practice-rounds/:id/advance`: advances a timer-expired declaration window or finalizes the declaration into kitty phase.
+- `POST /api/practice-rounds/:id/kitty`: `{ "buriedIds": ["..."] }`; exchanges the exact kitty size and starts the first trick with the scheduled dealer leading.
+
+Practice rounds are intentionally in-memory and expire when the backend restarts. They are a development harness for the pure state machine, not persistent multiplayer sessions.
 
 `PORT` and `HOST` configure the backend (defaults `4000`, `127.0.0.1`). `API_TARGET` configures Vite's backend proxy. Set these in the shell; the backend does not load `.env` files automatically. Never put secrets in frontend configuration.
 

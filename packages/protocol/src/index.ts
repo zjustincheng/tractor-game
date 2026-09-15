@@ -99,3 +99,51 @@ export const exerciseErrorSchema = z.strictObject({
 export type ExerciseSummary = z.infer<typeof exerciseSummarySchema>;
 export type ExerciseView = z.infer<typeof exerciseViewSchema>;
 export type ExerciseSuccess = z.infer<typeof exerciseSuccessSchema>;
+
+export const practiceRoundCreateSchema = z.strictObject({
+  playerCount: z.union(PLAYER_COUNTS.map((count) => z.literal(count))),
+  attackingTeam: z.enum(['A', 'B']).default('A'),
+});
+export const declarationViewSchema = z.strictObject({
+  kind: z.enum(['suit', 'joker']),
+  level: z.enum(RANKS),
+  suit: z.enum(SUITS).nullable(),
+  joker: z.enum(['small', 'big', 'mixed']).nullable(),
+  multiplicity: z.number().int().positive(),
+  cardIds: z.array(z.string()),
+});
+export const practiceRoundViewSchema = z.strictObject({
+  id: z.string().uuid(),
+  rulesVersion: z.string(),
+  playerCount: z.union(PLAYER_COUNTS.map((count) => z.literal(count))),
+  round: z.number().int().positive(),
+  phase: z.enum(['declaration', 'kitty', 'tricks', 'finished']),
+  dealerSeat: z.number().int().nonnegative(),
+  attackingTeam: z.enum(['A', 'B']),
+  levels: z.strictObject({ A: z.enum(RANKS), B: z.enum(RANKS) }),
+  defenderScore: z.number().int(),
+  declarationDeadline: z.number().int(),
+  declaration: declarationViewSchema.nullable(),
+  houseBuilderSeat: z.number().int().nonnegative().nullable(),
+  trump: z
+    .strictObject({ level: z.enum(RANKS), suit: z.enum(SUITS).nullable() })
+    .nullable(),
+  viewerSeat: z.literal(0),
+  hand: z.array(cardSchema),
+  seats: z.array(
+    z.strictObject({
+      seat: z.number().int().nonnegative(),
+      team: z.enum(['A', 'B']),
+      cardCount: z.number().int().nonnegative(),
+    }),
+  ),
+  kittyCount: z.number().int().positive(),
+  declarationOptions: z.array(declarationViewSchema),
+});
+export const practiceRoundDeclarationSchema = z.strictObject({
+  cardIds: z.array(z.string().min(1).max(100)).min(1).max(4),
+});
+export const practiceRoundKittySchema = z.strictObject({
+  buriedIds: z.array(z.string().min(1).max(100)).min(1).max(10),
+});
+export type PracticeRoundCreate = z.infer<typeof practiceRoundCreateSchema>;
