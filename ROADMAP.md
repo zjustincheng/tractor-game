@@ -12,10 +12,12 @@ The repository now has a foundation implementation: a React practice table, a st
 - [x] Decks, points, effective hierarchy, homogeneous recognition/comparison, pure dealing, dealer rotation, and scoring/level advancement.
 - [x] Shared validated preview schemas and private viewer-hand projection.
 - [x] Declaration eligibility, multiplicity overturning, joker declaration counts, and first-round joker takeover helpers.
+- [x] Round declaration windows, deterministic fallback, scheduled-dealer kitty exchange, and transition into trick state.
+- [x] Round settlement helper for defender points, kitty multipliers, advancement, role swaps, match victory, and Jack reset gating.
 - [x] Responsive practice table with 4/6/8/10-seat layouts, card selection, and score exploration.
 - [x] Rules/API tests, guided trick drills, and desktop/mobile browser journeys.
 - [x] Local frontend/backend containers and an optional PostgreSQL service for later persistence.
-- [ ] Authoritative match state machine, commands/events, injected timers, declaration lock windows, and replay fixtures.
+- [~] Authoritative match state machine, declaration/kitty transitions, injected timestamps, and replay-ready pure state helpers; command/event persistence remains.
 - [~] Follow/gamble engine exercised in fixed drills; complete match integration, declarations, kitty exchange, and round settlement remain.
 - [ ] Live rooms, reconnect, persistence, and production deployment.
 

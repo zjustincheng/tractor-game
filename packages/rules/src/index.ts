@@ -6,3 +6,4 @@ export * from './follow.js';
 export * from './gamble.js';
 export * from './trick.js';
 export * from './declarations.js';
+export * from './match.js';
