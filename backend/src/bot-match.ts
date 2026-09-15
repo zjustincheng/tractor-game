@@ -3,6 +3,7 @@ import {
   canOverturn,
   chooseBotBurial,
   chooseBotLead,
+  chooseBotGambleLead,
   chooseBotPlay,
   compareComponents,
   createDeck,
@@ -140,12 +141,24 @@ function runBots(match: BotMatch): BotMatch {
     const winnerSeat = trick.winnerSeat;
     const cards =
       trick.plays.length === 0
-        ? chooseBotLead(trick.hands[seat]!, trick.trump, {
-            role:
-              teamAt(seat) === trick.attackingTeam ? 'attackers' : 'defenders',
-            defenderScore: state.defenderScore,
-            swapThreshold: trick.playerCount * 20,
-          })
+        ? (() => {
+            const role =
+              teamAt(seat) === trick.attackingTeam ? 'attackers' : 'defenders';
+            const gamble = chooseBotGambleLead(
+              trick.hands[seat]!,
+              trick.hands.filter((_, index) => index !== seat),
+              trick.trump,
+              role,
+            );
+            return (
+              gamble ??
+              chooseBotLead(trick.hands[seat]!, trick.trump, {
+                role,
+                defenderScore: state.defenderScore,
+                swapThreshold: trick.playerCount * 20,
+              })
+            );
+          })()
         : chooseBotPlay(
             trick.hands[seat]!,
             trick.plays[0]!.components,

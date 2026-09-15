@@ -2,6 +2,7 @@ import { cardPoints, category, effectivePower, teamAt } from './cards.js';
 import type { Card, Trump } from './cards.js';
 import {
   availableComponents,
+  decomposeLead,
   identityGroups,
   matchComponents,
   withoutCards,
@@ -9,6 +10,7 @@ import {
 import type { Component } from './components.js';
 import { validateFollow } from './follow.js';
 import { winningComponents } from './gamble.js';
+import { validateGamble } from './gamble.js';
 
 export interface BotPlayContext {
   seat: number;
@@ -60,6 +62,41 @@ export function chooseBotLead(
         .localeCompare(b.component.cards.map((card) => card.id).join('|')),
   );
   return ranked[0]!.component.cards.map((card) => card.id);
+}
+
+/** Return a gamble lead only when its component grouping passes server-side validation. */
+export function chooseBotGambleLead(
+  hand: readonly Card[],
+  otherHands: readonly (readonly Card[])[],
+  trump: Trump,
+  role: 'attackers' | 'defenders',
+): string[] | null {
+  if (role !== 'attackers') return null;
+  const categories = [...new Set(hand.map((card) => category(card, trump)))];
+  const choices = categories
+    .map((group) => {
+      const cards = hand.filter((card) => category(card, trump) === group);
+      const components = decomposeLead(cards, trump);
+      if (!components || components.length < 2) return null;
+      const result = validateGamble(components, otherHands, trump, 'attackers');
+      return result.reduced ? null : { cards, size: cards.length, components };
+    })
+    .filter(
+      (
+        choice,
+      ): choice is { cards: Card[]; size: number; components: Component[] } =>
+        choice !== null,
+    );
+  choices.sort(
+    (a, b) =>
+      b.size - a.size ||
+      b.components.length - a.components.length ||
+      a.cards
+        .map((card) => card.id)
+        .join('|')
+        .localeCompare(b.cards.map((card) => card.id).join('|')),
+  );
+  return choices[0]?.cards.map((card) => card.id) ?? null;
 }
 
 /** Uses only the bot's hand, public lead, and trump; never opponents' hands. */

@@ -4,6 +4,7 @@ import {
   category,
   chooseBotPlay,
   chooseBotLead,
+  chooseBotGambleLead,
   createDeck,
   deal,
   decomposeLead,
@@ -58,6 +59,26 @@ describe('bot follow selection', () => {
         swapThreshold: 80,
       }),
     ).toEqual(['kh']);
+  });
+  it('chooses an attacker gamble only when its components survive validation', () => {
+    const hand = [
+      card('3', 'clubs', 'a'),
+      card('3', 'clubs', 'b'),
+      card('4', 'clubs', 'c'),
+      card('4', 'clubs', 'd'),
+      card('K', 'clubs', 'e'),
+    ];
+    const otherHands = [[card('2', 'hearts')], [card('A', 'hearts')]];
+    expect(chooseBotGambleLead(hand, otherHands, trump, 'attackers')).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+    ]);
+    expect(
+      chooseBotGambleLead(hand, [[card('A', 'clubs')]], trump, 'attackers'),
+    ).toBeNull();
   });
   it('beats an opponent with the cheapest winning single', () => {
     expect(
