@@ -1,0 +1,19 @@
+{
+  "name": "@tractor/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "esbuild src/server.ts --bundle --platform=node --target=node24 --format=esm --external:fastify --external:zod --outfile=dist/server.js",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@tractor/rules": "0.1.0",
+    "@tractor/protocol": "0.1.0",
+    "fastify": "5.12.4"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

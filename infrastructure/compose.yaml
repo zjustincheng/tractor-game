@@ -1,0 +1,45 @@
+name: tractor-game
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: infrastructure/backend.Dockerfile
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+  frontend:
+    build:
+      context: ..
+      dockerfile: infrastructure/frontend.Dockerfile
+    ports: ['127.0.0.1:8080:80']
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+  # Reserved for the persistence milestone; the practice API does not use a DB.
+  postgres:
+    image: postgres:18-alpine
+    profiles: ['persistence']
+    environment:
+      POSTGRES_USER: tractor
+      POSTGRES_DB: tractor
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tractor-local-only}
+    ports: ['127.0.0.1:5432:5432']
+    volumes: ['postgres-data:/var/lib/postgresql']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U tractor -d tractor']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+volumes:
+  postgres-data:

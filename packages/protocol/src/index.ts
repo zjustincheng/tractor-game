@@ -1,0 +1,101 @@
+import { z } from 'zod';
+import { PLAYER_COUNTS, RANKS, SUITS } from '@tractor/rules';
+
+export const previewRequestSchema = z.strictObject({
+  playerCount: z.union(PLAYER_COUNTS.map((count) => z.literal(count))),
+  level: z.enum(RANKS),
+  trumpSuit: z.enum(SUITS).nullable(),
+});
+
+export const cardSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    id: z.string(),
+    kind: z.literal('suited'),
+    suit: z.enum(SUITS),
+    rank: z.enum(RANKS),
+  }),
+  z.strictObject({
+    id: z.string(),
+    kind: z.literal('joker'),
+    joker: z.enum(['small', 'big']),
+  }),
+]);
+
+export const previewResponseSchema = z.strictObject({
+  kind: z.literal('practice-preview'),
+  id: z.string().uuid(),
+  rulesVersion: z.string(),
+  settings: previewRequestSchema,
+  viewerSeat: z.literal(0),
+  hand: z.array(cardSchema),
+  seats: z.array(
+    z.strictObject({
+      seat: z.number().int().nonnegative(),
+      team: z.enum(['A', 'B']),
+      cardCount: z.number().int().nonnegative(),
+    }),
+  ),
+  kittyCount: z.number().int().positive(),
+});
+
+export type PreviewRequest = z.infer<typeof previewRequestSchema>;
+export type PreviewResponse = z.infer<typeof previewResponseSchema>;
+
+export const exerciseSummarySchema = z.strictObject({
+  id: z.string().min(1).max(80),
+  title: z.string(),
+  description: z.string(),
+});
+export const exerciseListSchema = z.strictObject({
+  exercises: z.array(exerciseSummarySchema).min(1),
+});
+export const exerciseViewSchema = z.strictObject({
+  ...exerciseSummarySchema.shape,
+  tip: z.string(),
+  rulesVersion: z.string(),
+  settings: previewRequestSchema,
+  viewerSeat: z.number().int().nonnegative(),
+  attackingTeam: z.enum(['A', 'B']),
+  hand: z.array(cardSchema),
+  seats: previewResponseSchema.shape.seats,
+  plays: z.array(
+    z.strictObject({
+      seat: z.number().int().nonnegative(),
+      cards: z.array(cardSchema),
+      matchesLead: z.boolean(),
+    }),
+  ),
+  nextSeat: z.number().int().nonnegative().nullable(),
+  winnerSeat: z.number().int().nonnegative().nullable(),
+  status: z.enum(['playing', 'complete']),
+  penaltyPoints: z.number().int(),
+  capturedDefenderPoints: z.number().int().nonnegative(),
+  trickPoints: z.number().int().nonnegative(),
+});
+export const exerciseAttemptSchema = z.strictObject({
+  cardIds: z
+    .array(z.string().min(1).max(100))
+    .min(1)
+    .max(26)
+    .refine(
+      (ids) => new Set(ids).size === ids.length,
+      'Cards must be distinct.',
+    ),
+});
+export const exerciseSuccessSchema = z.strictObject({
+  accepted: z.literal(true),
+  view: exerciseViewSchema,
+  reduced: z.boolean(),
+  returnedIds: z.array(z.string()),
+  playedIds: z.array(z.string()),
+  penalty: z.number().int(),
+  matchesLead: z.boolean(),
+  message: z.string(),
+});
+export const exerciseErrorSchema = z.strictObject({
+  code: z.string(),
+  message: z.string(),
+});
+export type ExerciseSummary = z.infer<typeof exerciseSummarySchema>;
+export type ExerciseView = z.infer<typeof exerciseViewSchema>;
+export type ExerciseSuccess = z.infer<typeof exerciseSuccessSchema>;

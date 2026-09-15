@@ -1,0 +1,11 @@
+{
+  "name": "@tractor/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@tractor/rules": "0.1.0",
+    "zod": "4.6.5"
+  }
+}
