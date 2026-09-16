@@ -328,6 +328,35 @@ export function RoomMatch() {
               </div>
             ))}
           </div>
+          {game.plays.length > 0 && (
+            <div className="room-trick" aria-label="Current trick">
+              <div className="room-trick-heading">
+                <strong>
+                  {game.trickComplete
+                    ? `Trick won by seat ${(game.winnerSeat ?? 0) + 1}`
+                    : `Trick · seat ${(game.nextSeat ?? 0) + 1} to play`}
+                </strong>
+                <span>
+                  {game.plays.reduce((sum, play) => sum + play.cards.length, 0)}{' '}
+                  cards played
+                </span>
+              </div>
+              <div className="room-plays">
+                {game.plays.map((play) => (
+                  <div
+                    className={`room-play ${play.seat === game.winnerSeat ? 'winning' : ''}`}
+                    key={play.seat}
+                  >
+                    <strong>Seat {play.seat + 1}</strong>
+                    <span>{play.cards.map(label).join(' · ')}</span>
+                    <small>
+                      {play.matchesLead ? 'Matches lead' : 'Cannot win'}
+                    </small>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {game.phase === 'declaration' && (
             <div
               className="deal-progress"
