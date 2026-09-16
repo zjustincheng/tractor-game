@@ -352,6 +352,17 @@ export function BotMatchTable() {
               Counts include cards played in completed tricks. Unseen cards may
               still be anywhere.
             </small>
+            <div
+              className="tracker-odds"
+              aria-label="Estimated opponent category odds"
+            >
+              <strong>Estimated opponent holds</strong>{' '}
+              {Object.entries(view.categoryOdds).map(([categoryName, odds]) => (
+                <span key={categoryName}>
+                  {categoryName}: {Math.round(odds * 100)}%
+                </span>
+              ))}
+            </div>
             {view.knownVoids.length > 0 && (
               <small className="void-notes">
                 Known voids:{' '}

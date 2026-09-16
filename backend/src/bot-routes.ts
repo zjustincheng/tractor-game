@@ -65,6 +65,40 @@ export function botView(id: string, match: BotMatch, revision: number) {
       seenRankCounts[card.rank] = (seenRankCounts[card.rank] ?? 0) + 1;
     }
   }
+  const decks = state.playerCount / 2;
+  const categoryTotals = {
+    clubs: 13 * decks,
+    diamonds: 13 * decks,
+    hearts: 13 * decks,
+    spades: 13 * decks,
+    jokers: 4 * decks,
+  };
+  const ownCounts = { clubs: 0, diamonds: 0, hearts: 0, spades: 0, jokers: 0 };
+  for (const card of hand)
+    ownCounts[card.kind === 'joker' ? 'jokers' : card.suit] += 1;
+  const seenTotal = Object.values(seenCounts).reduce(
+    (sum, count) => sum + count,
+    0,
+  );
+  const unknownPool = Math.max(0, 54 * decks - seenTotal - hand.length);
+  const opponentSlots = state.hands
+    .slice(1)
+    .reduce((sum, cards) => sum + cards.length, 0);
+  const categoryOdds = Object.fromEntries(
+    Object.keys(categoryTotals).map((key) => {
+      const categoryKey = key as keyof typeof categoryTotals;
+      const remaining = Math.max(
+        0,
+        categoryTotals[categoryKey] -
+          seenCounts[categoryKey] -
+          ownCounts[categoryKey],
+      );
+      let miss = 1;
+      for (let i = 0; i < Math.min(opponentSlots, unknownPool); i++)
+        miss *= Math.max(0, (unknownPool - remaining - i) / (unknownPool - i));
+      return [key, Number((1 - miss).toFixed(3))];
+    }),
+  );
   const suggestion =
     state.phase === 'kitty' && state.dealerSeat === 0
       ? chooseBotBurial(hand, state.kitty.length, state.trump!)
@@ -88,6 +122,7 @@ export function botView(id: string, match: BotMatch, revision: number) {
   return botMatchViewSchema.parse({
     seenCounts,
     seenRankCounts,
+    categoryOdds,
     knownVoids,
     history: match.history,
     rounds: match.rounds.map(({ round, settlement }) => ({

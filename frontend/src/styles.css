@@ -1238,6 +1238,17 @@ input[type='range'] {
   margin-top: 0.25rem;
   color: #765817;
 }
+.tracker-odds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+  margin-top: 0.5rem;
+  color: #52675a;
+  font-size: 0.76rem;
+}
+.tracker-odds strong {
+  color: #315943;
+}
 @media (max-width: 760px) {
   .match-identity {
     grid-template-columns: repeat(2, minmax(0, 1fr));
