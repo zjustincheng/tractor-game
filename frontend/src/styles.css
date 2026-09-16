@@ -1335,6 +1335,17 @@ input[type='range'] {
 .room-status span {
   color: #617565;
 }
+.deal-progress {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.8rem 0;
+  color: #52675a;
+  font-size: 0.8rem;
+}
+.deal-progress progress {
+  width: 100%;
+  accent-color: #285b43;
+}
 .room-options {
   display: flex;
   flex-wrap: wrap;

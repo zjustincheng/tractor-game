@@ -33,7 +33,8 @@ The repository includes playable solo bot matches, a React practice table, a Fas
 - [x] Revisioned room event polling for joins and ready-state changes with authorized projections.
 - [x] Ready rooms create a private server-authoritative deal and accept revision-checked declaration, timer, kitty, and trick commands.
 - [x] Deterministic opponent category odds from public counts, own hand, and remaining slots.
-- [ ] Dealing animation tied to server-side receipt timestamps.
+- [x] Room dealing progress uses server-issued start timestamps and fixed rotation duration.
+- [ ] Multi-process coordination and hosted production deployment.
 - [x] Live room frontend/lobby, local reconnect polling, and private hand/action controls.
 - [x] Authoritative room transitions between completed tricks, including final-hand completion.
 - [x] Room round settlement with defender scoring, kitty multiplier, level advancement, and Jack reset.

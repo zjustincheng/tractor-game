@@ -303,6 +303,8 @@ export const roomGameViewSchema = z.strictObject({
     }),
   ),
   declarationDeadline: z.number().int(),
+  dealingStartedAt: z.number().int(),
+  dealingDurationMs: z.number().int().positive(),
   declaration: declarationViewSchema.nullable(),
   declarationOptions: z.array(declarationViewSchema),
   trump: z

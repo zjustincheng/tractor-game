@@ -64,6 +64,7 @@ interface Room {
   trickPoints: number;
   penaltyPoints: number;
   settlement: ReturnType<typeof settleRound> | null;
+  dealingStartedAt: number;
 }
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function code() {
@@ -115,6 +116,8 @@ function gameProject(room: Room, viewer: RoomPlayer) {
       cardCount: hand.length,
     })),
     declarationDeadline: state.declarationDeadline,
+    dealingStartedAt: room.dealingStartedAt,
+    dealingDurationMs: Math.ceil((state.playerCount / 2) * 1000),
     declaration: state.declaration
       ? {
           kind: state.declaration.kind,
@@ -197,8 +200,10 @@ export function registerRoomRoutes(
           room.code &&
           room.players?.length &&
           room.createdAt > now() - 24 * 60 * 60 * 1000
-        )
+        ) {
+          room.dealingStartedAt ??= room.createdAt;
           rooms.set(room.code, room);
+        }
       } catch {
         /* ignore corrupt room snapshots; solo match saves remain recoverable */
       }
@@ -255,6 +260,7 @@ export function registerRoomRoutes(
       trickPoints: 0,
       penaltyPoints: 0,
       settlement: null,
+      dealingStartedAt: now(),
     };
     addEvent(room, {
       type: 'room-created',

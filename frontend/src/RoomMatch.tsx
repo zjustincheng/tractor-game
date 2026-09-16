@@ -29,6 +29,7 @@ export function RoomMatch() {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [clock, setClock] = useState(() => Date.now());
 
   const request = async (path: string, body?: unknown) => {
     const response = await fetch(
@@ -120,6 +121,10 @@ export function RoomMatch() {
       window.clearInterval(timer);
     };
   }, [room?.code, token, revision]);
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, []);
   async function command(
     action: 'ready' | 'declare' | 'advance' | 'bury' | 'play' | 'next-trick',
     cardIds?: string[],
@@ -276,6 +281,21 @@ export function RoomMatch() {
             </strong>
             <span>{game.message}</span>
           </div>
+          {game.phase === 'declaration' && (
+            <div
+              className="deal-progress"
+              aria-label="Synchronized deal progress"
+            >
+              <span>Dealing from server</span>
+              <progress
+                max={game.dealingDurationMs}
+                value={Math.min(
+                  game.dealingDurationMs,
+                  Math.max(0, clock - game.dealingStartedAt),
+                )}
+              />
+            </div>
+          )}
           {game.declarationOptions.length > 0 && (
             <div className="room-options">
               <p className="eyebrow">AVAILABLE CALLS</p>
