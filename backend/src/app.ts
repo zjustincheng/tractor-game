@@ -34,6 +34,9 @@ export function buildApp(
   app.get('/api/health', async () => ({
     status: 'ok',
     rulesVersion: RULES_VERSION,
+    multiplayerPersistence: options.saveDirectory
+      ? 'file-single-instance'
+      : 'memory',
   }));
   app.get('/api/config', async () => ({
     rulesVersion: RULES_VERSION,
@@ -42,6 +45,9 @@ export function buildApp(
       practicePreview: true,
       practiceTricks: true,
       multiplayer: true,
+      multiplayerPersistence: options.saveDirectory
+        ? 'file-single-instance'
+        : 'memory',
     },
   }));
 

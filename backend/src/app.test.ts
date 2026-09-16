@@ -17,11 +17,15 @@ describe('practice API', () => {
   it('reports health and accurately describes supported capabilities', async () => {
     const server = app();
     expect((await server.inject('/api/health')).json().status).toBe('ok');
+    expect(
+      (await server.inject('/api/health')).json().multiplayerPersistence,
+    ).toBe('memory');
     const response = await server.inject('/api/config');
     expect(response.json().capabilities).toEqual({
       practicePreview: true,
       practiceTricks: true,
       multiplayer: true,
+      multiplayerPersistence: 'memory',
     });
     expect(response.json().modes).toHaveLength(4);
   });

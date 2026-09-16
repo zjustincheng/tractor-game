@@ -40,6 +40,7 @@ The repository includes playable solo bot matches, a React practice table, a Fas
 - [x] Authoritative room transitions between completed tricks, including final-hand completion.
 - [x] Room round settlement with defender scoring, kitty multiplier, level advancement, and Jack reset.
 - [x] Host-controlled next-round redeal with persisted level and dealer progression.
+- [x] Health/config observability for multiplayer persistence mode.
 - [x] File-backed multiplayer room snapshots with atomic writes and restart recovery.
 - [x] Container health checks and shared match-data volume configuration for single-instance deployment.
 - [x] CI production container build verification and single-instance deployment documentation.

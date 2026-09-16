@@ -75,7 +75,7 @@ Colocate rules/API tests as `*.test.ts`; browser tests use `*.spec.ts`. Use stri
 
 ## API and configuration
 
-- `GET /api/health`: process health and rules version.
+- `GET /api/health`: process health, rules version, and multiplayer persistence mode (`memory` or `file-single-instance`).
 - `POST /api/bot-matches`: `{ "playerCount": 4 }`; creates a solo match.
 - `GET /api/bot-matches/:id`: returns the human hand, public table, legal declaration options, and suggested cards.
 - `POST /api/bot-matches/:id/commands`: `{ "action": "play", "cardIds": ["..."], "revision": 3 }`; actions are `declare`, `bury`, `play`, `advance`, and `next-round`. Stale revisions return 409; rejected moves preserve state.
