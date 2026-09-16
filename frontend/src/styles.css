@@ -1335,6 +1335,20 @@ input[type='range'] {
 .room-status span {
   color: #617565;
 }
+.room-settlement {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.8rem 0;
+  padding: 0.8rem;
+  border: 1px solid #b7caa9;
+  border-radius: 8px;
+  background: #fff8dd;
+  color: #5b4b1d;
+}
+.room-settlement span,
+.room-settlement small {
+  color: #756b45;
+}
 .room-identity {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

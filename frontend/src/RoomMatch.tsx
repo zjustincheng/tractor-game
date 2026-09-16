@@ -291,6 +291,30 @@ export function RoomMatch() {
             </strong>
             <span>{game.message}</span>
           </div>
+          {game.settlement && (
+            <div className="room-settlement" aria-label="Round settlement">
+              <strong>
+                {game.settlement.winner
+                  ? `Team ${game.settlement.winner} wins the match`
+                  : 'Round complete'}
+              </strong>
+              <span>
+                {game.settlement.defenderScore} defender points · kitty{' '}
+                {game.settlement.kittyPoints} points (
+                {game.settlement.kittyMultiplier}×)
+              </span>
+              <span>
+                Levels: Team A {game.settlement.levels.A} · Team B{' '}
+                {game.settlement.levels.B}
+              </span>
+              {game.settlement.rolesSwapped && (
+                <small>Teams swap attacking roles next round.</small>
+              )}
+              {game.settlement.jackReset && (
+                <small>Jack reset: attackers return to level 2.</small>
+              )}
+            </div>
+          )}
           <div className="room-identity" aria-label="Room strategy context">
             <span>
               <strong>Your team</strong> Team{' '}
