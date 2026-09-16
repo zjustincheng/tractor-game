@@ -1,4 +1,17 @@
 import { randomInt, randomUUID } from 'node:crypto';
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import {
   roomCreateSchema,
@@ -165,13 +178,54 @@ function gameProject(room: Room, viewer: RoomPlayer) {
 
 export function registerRoomRoutes(
   app: FastifyInstance,
-  options: { now?: () => number } = {},
+  options: { now?: () => number; saveDirectory?: string } = {},
 ) {
   const rooms = new Map<string, Room>();
   const now = options.now ?? Date.now;
+  const directory = options.saveDirectory
+    ? join(options.saveDirectory, 'rooms')
+    : undefined;
+  if (directory) {
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    for (const file of readdirSync(directory)) {
+      if (!file.endsWith('.json')) continue;
+      try {
+        const room = JSON.parse(
+          readFileSync(join(directory, file), 'utf8'),
+        ) as Room;
+        if (
+          room.code &&
+          room.players?.length &&
+          room.createdAt > now() - 24 * 60 * 60 * 1000
+        )
+          rooms.set(room.code, room);
+      } catch {
+        /* ignore corrupt room snapshots; solo match saves remain recoverable */
+      }
+    }
+  }
+  const persist = (room: Room) => {
+    if (!directory) return;
+    const target = join(directory, `${room.code}.json`);
+    const temporary = `${target}.tmp`;
+    const descriptor = openSync(temporary, 'w', 0o600);
+    try {
+      writeFileSync(descriptor, JSON.stringify(room));
+      fsyncSync(descriptor);
+    } finally {
+      closeSync(descriptor);
+    }
+    renameSync(temporary, target);
+  };
   const cleanup = () => {
     for (const [key, room] of rooms)
-      if (room.createdAt < now() - 24 * 60 * 60 * 1000) rooms.delete(key);
+      if (room.createdAt < now() - 24 * 60 * 60 * 1000) {
+        rooms.delete(key);
+        if (directory) {
+          const file = join(directory, `${key}.json`);
+          if (existsSync(file)) rmSync(file);
+        }
+      }
   };
   app.post('/api/rooms', async (request, reply) => {
     const parsed = roomCreateSchema.safeParse(request.body);
@@ -209,6 +263,7 @@ export function registerRoomRoutes(
       ready: false,
     });
     rooms.set(roomCode, room);
+    persist(room);
     return { room: project(room, player), playerToken: player.token };
   });
   app.post<{ Params: { code: string } }>(
@@ -247,6 +302,7 @@ export function registerRoomRoutes(
         displayName: player.displayName,
         ready: false,
       });
+      persist(room);
       return { room: project(room, player), playerToken: player.token };
     },
   );
@@ -332,6 +388,7 @@ export function registerRoomRoutes(
         });
         room.matchRevision = 1;
       }
+      persist(room);
       return project(room, player);
     },
   );
@@ -470,6 +527,7 @@ export function registerRoomRoutes(
           .send({ code: result.code, message: result.message });
       room.match = result.state;
       room.matchRevision += 1;
+      persist(room);
       return gameProject(room, viewer);
     },
   );

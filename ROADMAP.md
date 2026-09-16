@@ -36,7 +36,8 @@ The repository includes playable solo bot matches, a React practice table, a Fas
 - [x] Live room frontend/lobby, local reconnect polling, and private hand/action controls.
 - [x] Authoritative room transitions between completed tricks, including final-hand completion.
 - [x] Room round settlement with defender scoring, kitty multiplier, level advancement, and Jack reset.
-- [ ] Durable multiplayer event/state persistence and production deployment.
+- [x] File-backed multiplayer room snapshots with atomic writes and restart recovery.
+- [ ] Multi-process coordination and production deployment.
 
 See [README.md](README.md) for commands and [docs/testing.md](docs/testing.md) for the exact coverage boundary. These checks represent foundation progress, not completion of the full game.
 
