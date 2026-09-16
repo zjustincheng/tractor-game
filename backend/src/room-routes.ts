@@ -38,6 +38,8 @@ import {
   nextDealer,
 } from '@tractor/rules';
 import type { Card, MatchState, PLAYER_COUNTS } from '@tractor/rules';
+import { MemoryRoomRepository } from './room-repository.js';
+import type { RoomRepository } from './room-repository.js';
 
 interface RoomPlayer {
   token: string;
@@ -82,7 +84,7 @@ function code() {
   for (let i = 0; i < 6; i++) value += alphabet[randomInt(alphabet.length)];
   return value;
 }
-function findRoom(rooms: Map<string, Room>, value: string) {
+function findRoom(rooms: RoomRepository<Room>, value: string) {
   return rooms.get(value.toUpperCase());
 }
 function authorized(room: Room | undefined, token: string | undefined) {
@@ -197,7 +199,7 @@ export function registerRoomRoutes(
   app: FastifyInstance,
   options: { now?: () => number; saveDirectory?: string } = {},
 ) {
-  const rooms = new Map<string, Room>();
+  const rooms = new MemoryRoomRepository<Room>();
   const now = options.now ?? Date.now;
   const directory = options.saveDirectory
     ? join(options.saveDirectory, 'rooms')
