@@ -1406,6 +1406,26 @@ input[type='range'] {
   color: #738175;
   font-size: 0.7rem;
 }
+.room-history {
+  margin: 1rem 0;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #d3dace;
+  border-radius: 7px;
+}
+.room-history summary {
+  cursor: pointer;
+  color: #294f3c;
+  font-weight: 650;
+}
+.room-history-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid #e0e4dc;
+  color: #52675a;
+  font-size: 0.78rem;
+}
 @media (max-width: 760px) {
   .room-identity {
     grid-template-columns: repeat(2, minmax(0, 1fr));

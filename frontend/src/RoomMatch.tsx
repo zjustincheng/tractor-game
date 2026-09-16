@@ -468,6 +468,25 @@ export function RoomMatch() {
       ) : (
         <p>Loading game…</p>
       )}
+      {game && game.history.length > 0 && (
+        <details className="room-history">
+          <summary>Trick history ({game.history.length})</summary>
+          {game.history
+            .slice()
+            .reverse()
+            .map((trick) => (
+              <div className="room-history-row" key={trick.number}>
+                <strong>
+                  #{trick.number} · Seat {trick.winnerSeat + 1}
+                </strong>
+                <span>
+                  {trick.points} points · {trick.defenderPoints} to defenders
+                  {trick.penalty ? ` · ${trick.penalty} penalty` : ''}
+                </span>
+              </div>
+            ))}
+        </details>
+      )}
       {message && <p className="error-text">{message}</p>}
     </section>
   );

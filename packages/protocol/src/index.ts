@@ -324,6 +324,16 @@ export const roomGameViewSchema = z.strictObject({
   winnerSeat: z.number().int().nullable(),
   trickComplete: z.boolean(),
   plays: exerciseViewSchema.shape.plays,
+  history: z.array(
+    z.strictObject({
+      number: z.number().int().positive(),
+      winnerSeat: z.number().int().nonnegative(),
+      points: z.number().int().nonnegative(),
+      defenderPoints: z.number().int().nonnegative(),
+      penalty: z.number().int(),
+      plays: exerciseViewSchema.shape.plays,
+    }),
+  ),
   kittyCount: z.number().int().nonnegative(),
   defenderScore: z.number().int(),
   settlement: z

@@ -37,13 +37,21 @@ import {
   teamAt,
   nextDealer,
 } from '@tractor/rules';
-import type { MatchState, PLAYER_COUNTS } from '@tractor/rules';
+import type { Card, MatchState, PLAYER_COUNTS } from '@tractor/rules';
 
 interface RoomPlayer {
   token: string;
   seat: number;
   displayName: string;
   ready: boolean;
+}
+interface RoomTrick {
+  number: number;
+  winnerSeat: number;
+  points: number;
+  defenderPoints: number;
+  penalty: number;
+  plays: Array<{ seat: number; cards: readonly Card[]; matchesLead: boolean }>;
 }
 interface RoomEvent {
   revision: number;
@@ -66,6 +74,7 @@ interface Room {
   penaltyPoints: number;
   settlement: ReturnType<typeof settleRound> | null;
   dealingStartedAt: number;
+  history: RoomTrick[];
 }
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function code() {
@@ -160,6 +169,7 @@ function gameProject(room: Room, viewer: RoomPlayer) {
         cards: play.cards,
         matchesLead: play.matchesLead,
       })) ?? [],
+    history: room.history,
     kittyCount: state.kitty.length,
     defenderScore: state.defenderScore,
     settlement: room.settlement
@@ -224,6 +234,7 @@ export function registerRoomRoutes(
           room.createdAt > now() - 24 * 60 * 60 * 1000
         ) {
           room.dealingStartedAt ??= room.createdAt;
+          room.history ??= [];
           rooms.set(room.code, room);
         }
       } catch {
@@ -283,6 +294,7 @@ export function registerRoomRoutes(
       penaltyPoints: 0,
       settlement: null,
       dealingStartedAt: now(),
+      history: [],
     };
     addEvent(room, {
       type: 'room-created',
@@ -487,6 +499,7 @@ export function registerRoomRoutes(
         room.trickPoints = 0;
         room.penaltyPoints = 0;
         room.settlement = null;
+        room.history = [];
         room.matchRevision += 1;
         persist(room);
         return gameProject(room, viewer);
@@ -576,6 +589,18 @@ export function registerRoomRoutes(
         if (played.ok && played.state.status === 'complete') {
           room.trickPoints += played.state.capturedDefenderPoints;
           room.penaltyPoints += played.state.penaltyPoints;
+          room.history.push({
+            number: room.history.length + 1,
+            winnerSeat: played.state.winnerSeat!,
+            points: played.state.trickPoints,
+            defenderPoints: played.state.capturedDefenderPoints,
+            penalty: played.state.penaltyPoints,
+            plays: played.state.plays.map(({ seat, cards, matchesLead }) => ({
+              seat,
+              cards,
+              matchesLead,
+            })),
+          });
         }
       }
       if (!result.ok)
