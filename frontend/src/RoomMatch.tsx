@@ -128,7 +128,14 @@ export function RoomMatch() {
     return () => window.clearInterval(timer);
   }, []);
   async function command(
-    action: 'ready' | 'declare' | 'advance' | 'bury' | 'play' | 'next-trick',
+    action:
+      | 'ready'
+      | 'declare'
+      | 'advance'
+      | 'bury'
+      | 'play'
+      | 'next-trick'
+      | 'next-round',
     cardIds?: string[],
   ) {
     if (!room || !token) return;
@@ -378,6 +385,17 @@ export function RoomMatch() {
                   {game.hand.length === 0 ? 'Finish round' : 'Next trick'}
                 </button>
               )}
+              {game.phase === 'finished' &&
+                game.settlement &&
+                !game.settlement.winner && (
+                  <button
+                    className="primary-button"
+                    disabled={busy || game.viewerSeat !== 0}
+                    onClick={() => void command('next-round')}
+                  >
+                    Start next round
+                  </button>
+                )}
             </>
           )}
         </div>

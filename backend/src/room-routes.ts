@@ -35,6 +35,7 @@ import {
   settleRound,
   shuffle,
   teamAt,
+  nextDealer,
 } from '@tractor/rules';
 import type { MatchState, PLAYER_COUNTS } from '@tractor/rules';
 
@@ -439,7 +440,36 @@ export function registerRoomRoutes(
         });
       let result: ReturnType<typeof receiveDeclaration>;
       const state = room.match;
-      if (parsed.data.action === 'declare') {
+      if (parsed.data.action === 'next-round') {
+        if (
+          viewer.seat !== room.hostSeat ||
+          !room.settlement ||
+          room.settlement.winner
+        )
+          return reply.code(422).send({
+            code: 'ROUND_NOT_READY',
+            message: 'The host can start another round after settlement.',
+          });
+        room.match = createRound({
+          playerCount: state.playerCount,
+          round: state.round + 1,
+          dealerSeat: nextDealer(
+            state.dealerSeat,
+            state.playerCount,
+            room.settlement.rolesSwapped,
+          ),
+          attackingTeam: room.settlement.attackingTeam,
+          levels: room.settlement.levels,
+          shoe: shuffle(createDeck(state.playerCount), randomInt),
+          firstDeclarationDeadline: now() + 8000,
+        });
+        room.trickPoints = 0;
+        room.penaltyPoints = 0;
+        room.settlement = null;
+        room.matchRevision += 1;
+        persist(room);
+        return gameProject(room, viewer);
+      } else if (parsed.data.action === 'declare') {
         const option = declarationsForHand(
           state.hands[viewer.seat]!,
           state.playerCount,

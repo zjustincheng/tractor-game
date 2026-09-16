@@ -283,7 +283,14 @@ export const roomEventsSchema = z.strictObject({
   room: roomViewSchema,
 });
 export const roomGameCommandSchema = z.strictObject({
-  action: z.enum(['declare', 'advance', 'bury', 'play', 'next-trick']),
+  action: z.enum([
+    'declare',
+    'advance',
+    'bury',
+    'play',
+    'next-trick',
+    'next-round',
+  ]),
   token: z.string().uuid(),
   cardIds: z.array(z.string().min(1).max(100)).max(36).optional(),
   revision: z.number().int().nonnegative(),
