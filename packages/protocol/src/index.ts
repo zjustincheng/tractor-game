@@ -153,6 +153,13 @@ export const botCommandSchema = z.strictObject({
   cardIds: z.array(z.string().min(1).max(100)).max(36).optional(),
 });
 export const botMatchViewSchema = z.strictObject({
+  seenCounts: z.strictObject({
+    clubs: z.number().int().nonnegative(),
+    diamonds: z.number().int().nonnegative(),
+    hearts: z.number().int().nonnegative(),
+    spades: z.number().int().nonnegative(),
+    jokers: z.number().int().nonnegative(),
+  }),
   history: z
     .array(
       z.strictObject({

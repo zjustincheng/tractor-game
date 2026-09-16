@@ -156,6 +156,9 @@ function runBots(match: BotMatch): BotMatch {
                 role,
                 defenderScore: state.defenderScore,
                 swapThreshold: trick.playerCount * 20,
+                seenCards: match.history.flatMap((item) =>
+                  item.plays.flatMap((play) => [...play.cards]),
+                ),
               })
             );
           })()

@@ -285,6 +285,23 @@ export function BotMatchTable() {
                 : 'Declaring'}
             </span>
           </div>
+          <details className="public-tracker">
+            <summary>Public cards tracked</summary>
+            <div className="tracker-grid">
+              {(
+                ['clubs', 'diamonds', 'hearts', 'spades', 'jokers'] as const
+              ).map((suit) => (
+                <span key={suit}>
+                  <strong>{view.seenCounts[suit]}</strong>{' '}
+                  {suit === 'jokers' ? 'jokers' : suit}
+                </span>
+              ))}
+            </div>
+            <small>
+              Counts include cards played in completed tricks. Unseen cards may
+              still be anywhere.
+            </small>
+          </details>
           <p role="status">{view.message}</p>
           <div
             className="match-identity"

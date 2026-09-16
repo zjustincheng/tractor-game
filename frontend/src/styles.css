@@ -1190,6 +1190,29 @@ input[type='range'] {
 .identity-opponents {
   background: #eeefea;
 }
+.public-tracker {
+  margin: 0.75rem 0;
+  color: #52675a;
+}
+.public-tracker summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+.tracker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.55rem 0 0.3rem;
+}
+.tracker-grid span {
+  padding: 0.35rem 0.55rem;
+  border-radius: 999px;
+  background: #e7ebe1;
+  font-size: 0.8rem;
+}
+.tracker-grid strong {
+  color: #244f3b;
+}
 @media (max-width: 760px) {
   .match-identity {
     grid-template-columns: repeat(2, minmax(0, 1fr));

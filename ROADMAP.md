@@ -25,7 +25,8 @@ The repository includes playable solo bot matches, a React practice table, a Fas
 - [x] Paced bot-play reveals with pause/skip controls, recent trick and round history, durable single-server snapshots, and Docker save volume.
 - [x] Role-aware bot leads that preserve attacker structure and pressure defender scoring near the swap threshold.
 - [x] Deliberate attacker gambles validated against all visible hands before leading.
-- [ ] Public card-counting, advanced declarations, and timed dealing animation.
+- [x] Public completed-trick card counts exposed in the table and used as a deterministic lead freshness signal.
+- [ ] Deeper card-counting inference, advanced declarations, and timed dealing animation.
 - [ ] Live rooms, reconnect, durable event/state persistence, and production deployment.
 
 See [README.md](README.md) for commands and [docs/testing.md](docs/testing.md) for the exact coverage boundary. These checks represent foundation progress, not completion of the full game.

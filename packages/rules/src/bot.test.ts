@@ -80,6 +80,20 @@ describe('bot follow selection', () => {
       chooseBotGambleLead(hand, [[card('A', 'clubs')]], trump, 'attackers'),
     ).toBeNull();
   });
+  it('prefers a fresher category when otherwise equivalent', () => {
+    const hand = [card('3', 'clubs', '3c'), card('K', 'hearts', 'kh')];
+    const seen = Array.from({ length: 12 }, (_, index) =>
+      card('4', 'clubs', `seen-${index}`),
+    );
+    expect(
+      chooseBotLead(hand, trump, {
+        role: 'attackers',
+        defenderScore: 0,
+        swapThreshold: 80,
+        seenCards: seen,
+      }),
+    ).toEqual(['kh']);
+  });
   it('beats an opponent with the cheapest winning single', () => {
     expect(
       select([card('3'), card('10'), card('K'), card('A')], [card('9')], false),

@@ -8,6 +8,8 @@ You can play a complete solo match against bots with 4, 6, 8, or 10 seats: decla
 
 Bots use deterministic strategies with their own hands and public trick information: conserve strength behind winning partners, feed points when last to play, choose cheap winning responses against opponents, adjust leads based on attacker/defender role and threshold pressure, and make attacker gambles only after server-side validation. They lead homogeneous structures and follow the existing structure/gamble rules; humans may attempt gambles. Cards are dealt instantly in solo mode, followed by the eight-second declaration window. Human multiplayer, timed dealing animation, and deployment remain in [ROADMAP.md](ROADMAP.md).
 
+Bots also count cards that have appeared in completed tricks. They use category freshness as a small lead preference, while the **Public cards tracked** panel shows those same public counts for clubs, diamonds, hearts, spades, and jokers.
+
 ## Run locally
 
 Requires Node.js 24 and npm. Use `nvm use` if you manage Node with nvm.

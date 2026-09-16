@@ -19,7 +19,7 @@ Run `npm run check` and `npm run test:e2e`. Browser tests require Chromium or an
 
 ## Foundation validation results
 
-- 172 rules/API tests passed, including four complete matches, role-aware leads, validated attacker gambles, tactical follows, failed-gamble feedback, snapshot restart recovery, failed writes, corrupt files, and expiry.
+- 173 rules/API tests passed, including four complete matches, validated attacker gambles, public-card freshness leads, tactical follows, failed-gamble feedback, snapshot restart recovery, failed writes, corrupt files, and expiry.
 - Twelve Playwright journeys passed across desktop Chrome and mobile Chrome emulation. Bot journeys cover paced turns, pause/skip controls, a complete round, history, resume after refresh, and starting round two.
 - Formatting, ESLint, TypeScript checks, and both production builds passed.
 - Both container images built; the local stack became healthy. HTTP smoke checks verified the frontend and private preview responses for all four player counts through nginx.

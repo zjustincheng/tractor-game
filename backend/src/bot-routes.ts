@@ -34,6 +34,13 @@ export function botView(id: string, match: BotMatch, revision: number) {
       ? [...state.hands[0]!, ...state.kitty]
       : state.hands[0]!;
   const trick = state.trick;
+  const seenCounts = { clubs: 0, diamonds: 0, hearts: 0, spades: 0, jokers: 0 };
+  for (const card of match.history.flatMap((item) =>
+    item.plays.flatMap((play) => [...play.cards]),
+  )) {
+    if (card.kind === 'joker') seenCounts.jokers += 1;
+    else seenCounts[card.suit] += 1;
+  }
   const suggestion =
     state.phase === 'kitty' && state.dealerSeat === 0
       ? chooseBotBurial(hand, state.kitty.length, state.trump!)
@@ -55,6 +62,7 @@ export function botView(id: string, match: BotMatch, revision: number) {
           )
         : [];
   return botMatchViewSchema.parse({
+    seenCounts,
     history: match.history,
     rounds: match.rounds.map(({ round, settlement }) => ({
       round,
