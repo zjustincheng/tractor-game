@@ -300,6 +300,9 @@ export const roomGameViewSchema = z.strictObject({
   revision: z.number().int().nonnegative(),
   viewerSeat: z.number().int().nonnegative(),
   playerCount: previewRequestSchema.shape.playerCount,
+  attackingTeam: z.enum(['A', 'B']),
+  dealerSeat: z.number().int().nonnegative(),
+  levels: z.strictObject({ A: z.enum(RANKS), B: z.enum(RANKS) }),
   phase: z.enum(['declaration', 'kitty', 'tricks', 'finished']),
   hand: z.array(cardSchema),
   players: z.array(

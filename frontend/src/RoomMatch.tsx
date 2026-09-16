@@ -291,6 +291,43 @@ export function RoomMatch() {
             </strong>
             <span>{game.message}</span>
           </div>
+          <div className="room-identity" aria-label="Room strategy context">
+            <span>
+              <strong>Your team</strong> Team{' '}
+              {game.viewerSeat % 2 === 0 ? 'A' : 'B'} ·{' '}
+              {game.attackingTeam === (game.viewerSeat % 2 === 0 ? 'A' : 'B')
+                ? 'Attackers'
+                : 'Defenders'}
+            </span>
+            <span>
+              <strong>Levels</strong> A {game.levels.A} · B {game.levels.B}
+            </span>
+            <span>
+              <strong>Defender score</strong> {game.defenderScore}
+            </span>
+            <span>
+              <strong>Dealer</strong> Seat {game.dealerSeat + 1}
+            </span>
+          </div>
+          <div className="room-players room-game-players">
+            {game.players.map((player) => (
+              <div
+                className={`room-player ${player.seat === game.viewerSeat ? 'current' : ''}`}
+                key={player.seat}
+              >
+                <strong>
+                  Seat {player.seat + 1}
+                  {player.seat === game.viewerSeat
+                    ? ' · You'
+                    : player.seat === (game.viewerSeat + 2) % game.playerCount
+                      ? ' · Partner'
+                      : ''}
+                </strong>
+                <span>{player.displayName}</span>
+                <small>{player.cardCount} cards</small>
+              </div>
+            ))}
+          </div>
           {game.phase === 'declaration' && (
             <div
               className="deal-progress"

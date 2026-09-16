@@ -1335,6 +1335,39 @@ input[type='range'] {
 .room-status span {
   color: #617565;
 }
+.room-identity {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0.8rem 0;
+}
+.room-identity span {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #d3dace;
+  border-radius: 7px;
+  color: #52675a;
+  font-size: 0.78rem;
+}
+.room-identity strong {
+  color: #294f3c;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.room-game-players {
+  margin: 0.8rem 0;
+}
+.room-player.current {
+  border-color: #285b43;
+  box-shadow: inset 0 0 0 1px #285b43;
+}
+@media (max-width: 760px) {
+  .room-identity {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 .deal-progress {
   display: grid;
   gap: 0.35rem;

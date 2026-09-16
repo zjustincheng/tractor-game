@@ -108,6 +108,9 @@ function gameProject(room: Room, viewer: RoomPlayer) {
     revision: room.matchRevision,
     viewerSeat: viewer.seat,
     playerCount: state.playerCount,
+    attackingTeam: state.attackingTeam,
+    dealerSeat: state.dealerSeat,
+    levels: state.levels,
     phase: state.phase,
     hand: state.hands[viewer.seat],
     players: state.hands.map((hand, seat) => ({
