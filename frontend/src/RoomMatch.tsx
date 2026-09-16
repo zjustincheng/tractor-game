@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   roomEventsSchema,
@@ -30,6 +30,7 @@ export function RoomMatch() {
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
   const [clock, setClock] = useState(() => Date.now());
+  const pollSequence = useRef(0);
 
   const request = async (path: string, body?: unknown) => {
     const response = await fetch(
@@ -95,13 +96,14 @@ export function RoomMatch() {
     if (!room || !token) return;
     let active = true;
     const poll = async () => {
+      const sequence = ++pollSequence.current;
       try {
         const events = roomEventsSchema.parse(
           await request(
             `/api/rooms/${room.code}/events?token=${token}&after=${revision}`,
           ),
         );
-        if (!active) return;
+        if (!active || sequence !== pollSequence.current) return;
         setRoom(events.room);
         setRevision(events.revision);
         if (events.room.started) {
@@ -130,6 +132,7 @@ export function RoomMatch() {
     cardIds?: string[],
   ) {
     if (!room || !token) return;
+    pollSequence.current += 1;
     setBusy(true);
     setMessage('');
     try {

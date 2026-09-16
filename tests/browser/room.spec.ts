@@ -13,4 +13,6 @@ test('creates a private room and shows the lobby', async ({ page }) => {
   ).toBeVisible();
   await expect(room.getByText('Browser Host')).toBeVisible();
   await expect(room.getByRole('button', { name: 'Ready up' })).toBeVisible();
+  await room.getByRole('button', { name: 'Ready up' }).click();
+  await expect(room.getByRole('button', { name: 'Not ready' })).toBeVisible();
 });
