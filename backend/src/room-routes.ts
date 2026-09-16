@@ -17,8 +17,11 @@ import {
   exchangeKitty,
   playCards,
   nextTrick,
+  compareComponents,
   receiveDeclaration,
+  settleRound,
   shuffle,
+  teamAt,
 } from '@tractor/rules';
 import type { MatchState, PLAYER_COUNTS } from '@tractor/rules';
 
@@ -45,6 +48,9 @@ interface Room {
   events: RoomEvent[];
   match?: MatchState;
   matchRevision: number;
+  trickPoints: number;
+  penaltyPoints: number;
+  settlement: ReturnType<typeof settleRound> | null;
 }
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function code() {
@@ -135,6 +141,19 @@ function gameProject(room: Room, viewer: RoomPlayer) {
         matchesLead: play.matchesLead,
       })) ?? [],
     kittyCount: state.kitty.length,
+    defenderScore: state.defenderScore,
+    settlement: room.settlement
+      ? {
+          defenderScore: room.settlement.defenderScore,
+          kittyPoints: room.settlement.kittyPoints,
+          kittyMultiplier: room.settlement.kittyMultiplier,
+          levels: room.settlement.levels,
+          attackingTeam: room.settlement.attackingTeam,
+          rolesSwapped: room.settlement.rolesSwapped,
+          jackReset: room.settlement.jackReset,
+          winner: room.settlement.winner,
+        }
+      : null,
     message:
       state.phase === 'declaration'
         ? 'Declaration window is open.'
@@ -179,6 +198,9 @@ export function registerRoomRoutes(
       revision: 0,
       events: [],
       matchRevision: 0,
+      trickPoints: 0,
+      penaltyPoints: 0,
+      settlement: null,
     };
     addEvent(room, {
       type: 'room-created',
@@ -377,12 +399,37 @@ export function registerRoomRoutes(
             message: 'Complete the current trick first.',
           });
         const handsEmpty = state.hands.every((hand) => hand.length === 0);
-        result = {
-          ok: true,
-          state: handsEmpty
-            ? { ...state, phase: 'finished' }
-            : { ...state, trick: nextTrick(state.trick) },
-        };
+        if (handsEmpty) {
+          const winning = state.trick.plays.find(
+            (play) => play.seat === state.trick!.winnerSeat,
+          )!;
+          const settlement = settleRound({
+            playerCount: state.playerCount,
+            attackingTeam: state.attackingTeam,
+            levels: state.levels,
+            trickPoints: room.trickPoints,
+            gamblePenaltyPoints: room.penaltyPoints,
+            finalTrickWinnerTeam: teamAt(state.trick.winnerSeat!),
+            finalWinningCards: winning.cards,
+            finalWinningStructure:
+              [...(winning.components ?? [])].sort(compareComponents)[0] ??
+              null,
+            kitty: state.kitty,
+          });
+          room.settlement = settlement;
+          result = {
+            ok: true,
+            state: {
+              ...state,
+              phase: 'finished',
+              defenderScore: settlement.defenderScore,
+            },
+          };
+        } else
+          result = {
+            ok: true,
+            state: { ...state, trick: nextTrick(state.trick) },
+          };
       } else {
         if (state.phase !== 'tricks' || !state.trick)
           return reply.code(422).send({
@@ -400,11 +447,22 @@ export function registerRoomRoutes(
               state: {
                 ...state,
                 phase: played.state.status === 'complete' ? 'tricks' : 'tricks',
+                defenderScore:
+                  played.state.status === 'complete'
+                    ? room.trickPoints +
+                      played.state.capturedDefenderPoints +
+                      room.penaltyPoints +
+                      played.state.penaltyPoints
+                    : state.defenderScore,
                 hands: played.state.hands,
                 trick: played.state,
               },
             }
           : { ok: false, code: 'INVALID_DECLARATION', message: played.message };
+        if (played.ok && played.state.status === 'complete') {
+          room.trickPoints += played.state.capturedDefenderPoints;
+          room.penaltyPoints += played.state.penaltyPoints;
+        }
       }
       if (!result.ok)
         return reply

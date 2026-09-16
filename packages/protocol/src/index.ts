@@ -312,6 +312,19 @@ export const roomGameViewSchema = z.strictObject({
   trickComplete: z.boolean(),
   plays: exerciseViewSchema.shape.plays,
   kittyCount: z.number().int().nonnegative(),
+  defenderScore: z.number().int(),
+  settlement: z
+    .strictObject({
+      defenderScore: z.number().int(),
+      kittyPoints: z.number().int(),
+      kittyMultiplier: z.number().int(),
+      levels: z.strictObject({ A: z.enum(RANKS), B: z.enum(RANKS) }),
+      attackingTeam: z.enum(['A', 'B']),
+      rolesSwapped: z.boolean(),
+      jackReset: z.boolean(),
+      winner: z.enum(['A', 'B']).nullable(),
+    })
+    .nullable(),
   message: z.string(),
 });
 export type RoomGameView = z.infer<typeof roomGameViewSchema>;
