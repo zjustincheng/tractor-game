@@ -38,6 +38,7 @@ The repository includes playable solo bot matches, a React practice table, a Fas
 - [x] Repeatable single-instance deployment entrypoint with Compose validation, build, startup, and status output.
 - [x] Single-owner room-volume lock prevents concurrent backend writers from corrupting snapshots.
 - [ ] Transactional multi-process coordination and hosted production deployment.
+- [~] PostgreSQL room schema and row-lock transaction plan documented for the next storage adapter.
 - [x] Live room frontend/lobby, local reconnect polling, and private hand/action controls.
 - [x] Authoritative room transitions between completed tricks, including final-hand completion.
 - [x] Room round settlement with defender scoring, kitty multiplier, level advancement, and Jack reset.

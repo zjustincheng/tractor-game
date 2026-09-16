@@ -36,4 +36,8 @@ The rules package accepts shuffle choices as an injected function and has no cal
 
 Local development uses Vite's API proxy. Container mode uses nginx with a private backend service. No websocket, database writes, or live-room authentication is present yet. The PostgreSQL Compose profile prepares a local service for later persistence work without making it a requirement for previews.
 
+### Multi-process room storage plan
+
+The current room service runs one process per save volume and enforces ownership with a lock file. The planned PostgreSQL migration is sketched in [`infrastructure/rooms.sql`](../infrastructure/rooms.sql): `tractor_rooms` stores the authoritative payload and revisions, while `tractor_room_events` stores append-only polling events. Each command will lock the room row, verify the submitted revision, update the payload, and append its event in one transaction. This preserves the existing optimistic-revision protocol while allowing multiple backend replicas.
+
 Tooling follows the official [Vite guide](https://vite.dev/guide/), [Fastify injection-testing guide](https://fastify.dev/docs/latest/Guides/Testing/), [Playwright web-server configuration](https://playwright.dev/docs/test-webserver), and [Compose application model](https://docs.docker.com/compose/intro/compose-application-model/).
