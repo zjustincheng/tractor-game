@@ -29,6 +29,7 @@ export class PostgresRoomStore {
     payload: unknown,
     revision: number,
     matchRevision: number,
+    event?: unknown,
   ) {
     const client = await this.pool.connect();
     try {
@@ -43,6 +44,11 @@ export class PostgresRoomStore {
         'insert into tractor_rooms(code, payload, revision, match_revision) values ($1, $2, $3, $4) on conflict (code) do update set payload = excluded.payload, revision = excluded.revision, match_revision = excluded.match_revision, touched_at = now()',
         [code, payload, revision, matchRevision],
       );
+      if (event !== undefined)
+        await client.query(
+          'insert into tractor_room_events(code, revision, payload) values ($1, $2, $3)',
+          [code, revision, event],
+        );
       await client.query('commit');
     } catch (error) {
       await client.query('rollback');
@@ -50,5 +56,12 @@ export class PostgresRoomStore {
     } finally {
       client.release();
     }
+  }
+  async events<T>(code: string, afterRevision: number) {
+    const result = await this.pool.query<{ revision: number; payload: T }>(
+      'select revision, payload from tractor_room_events where code = $1 and revision > $2 order by revision asc',
+      [code, afterRevision],
+    );
+    return result.rows;
   }
 }
