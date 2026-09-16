@@ -4,6 +4,7 @@ import {
   roomCreateSchema,
   roomJoinSchema,
   roomReadySchema,
+  roomEventsSchema,
   roomViewSchema,
 } from '@tractor/protocol';
 import type { PLAYER_COUNTS } from '@tractor/rules';
@@ -14,12 +15,21 @@ interface RoomPlayer {
   displayName: string;
   ready: boolean;
 }
+interface RoomEvent {
+  revision: number;
+  type: 'room-created' | 'player-joined' | 'player-ready' | 'player-left';
+  seat: number;
+  displayName?: string;
+  ready?: boolean;
+}
 interface Room {
   code: string;
   playerCount: (typeof PLAYER_COUNTS)[number];
   hostSeat: number;
   players: RoomPlayer[];
   createdAt: number;
+  revision: number;
+  events: RoomEvent[];
 }
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function code() {
@@ -32,6 +42,11 @@ function findRoom(rooms: Map<string, Room>, value: string) {
 }
 function authorized(room: Room | undefined, token: string | undefined) {
   return room?.players.find((player) => player.token === token);
+}
+function addEvent(room: Room, value: Omit<RoomEvent, 'revision'>) {
+  room.revision += 1;
+  room.events.push({ ...value, revision: room.revision });
+  if (room.events.length > 100) room.events.shift();
 }
 function project(room: Room, viewer: RoomPlayer) {
   return roomViewSchema.parse({
@@ -82,7 +97,15 @@ export function registerRoomRoutes(
       hostSeat: 0,
       players: [player],
       createdAt: now(),
+      revision: 0,
+      events: [],
     };
+    addEvent(room, {
+      type: 'room-created',
+      seat: 0,
+      displayName: player.displayName,
+      ready: false,
+    });
     rooms.set(roomCode, room);
     return { room: project(room, player), playerToken: player.token };
   });
@@ -116,9 +139,40 @@ export function registerRoomRoutes(
         ready: false,
       };
       room.players.push(player);
+      addEvent(room, {
+        type: 'player-joined',
+        seat,
+        displayName: player.displayName,
+        ready: false,
+      });
       return { room: project(room, player), playerToken: player.token };
     },
   );
+  app.get<{
+    Params: { code: string };
+    Querystring: { token?: string; after?: string };
+  }>('/api/rooms/:code/events', async (request, reply) => {
+    cleanup();
+    const room = findRoom(rooms, request.params.code);
+    const viewer = authorized(room, request.query.token);
+    if (!room || !viewer)
+      return reply.code(404).send({
+        code: 'ROOM_NOT_FOUND',
+        message: 'Room or player session not found.',
+      });
+    const after =
+      request.query.after === undefined ? 0 : Number(request.query.after);
+    if (!Number.isSafeInteger(after) || after < 0 || after > room.revision)
+      return reply.code(400).send({
+        code: 'INVALID_REVISION',
+        message: 'Use a valid room revision.',
+      });
+    return roomEventsSchema.parse({
+      revision: room.revision,
+      events: room.events.filter((item) => item.revision > after),
+      room: project(room, viewer),
+    });
+  });
   app.get<{ Params: { code: string }; Querystring: { token?: string } }>(
     '/api/rooms/:code',
     async (request, reply) => {
@@ -157,6 +211,11 @@ export function registerRoomRoutes(
           item.ready = false;
         });
       player.ready = parsed.data.ready;
+      addEvent(room, {
+        type: 'player-ready',
+        seat: player.seat,
+        ready: player.ready,
+      });
       return project(room, player);
     },
   );

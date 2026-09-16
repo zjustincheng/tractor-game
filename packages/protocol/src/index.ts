@@ -262,3 +262,21 @@ export const roomViewSchema = z.strictObject({
   ),
   started: z.boolean(),
 });
+export const roomEventsSchema = z.strictObject({
+  revision: z.number().int().nonnegative(),
+  events: z.array(
+    z.strictObject({
+      revision: z.number().int().positive(),
+      type: z.enum([
+        'room-created',
+        'player-joined',
+        'player-ready',
+        'player-left',
+      ]),
+      seat: z.number().int().nonnegative(),
+      displayName: z.string().optional(),
+      ready: z.boolean().optional(),
+    }),
+  ),
+  room: roomViewSchema,
+});

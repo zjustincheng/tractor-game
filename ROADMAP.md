@@ -30,8 +30,9 @@ The repository includes playable solo bot matches, a React practice table, a Fas
 - [x] Timed solo per-card dealing phase with progress, control lock, reduced-motion support, and mobile browser coverage.
 - [x] Known-void inference from public off-suit plays, bot lead adjustments, and visible void notes.
 - [x] Private room foundation with invite codes, token-protected lobby views, seat assignment, ready state, and full-room rejection.
+- [x] Revisioned room event polling for joins and ready-state changes with authorized projections.
 - [ ] Deeper probability inference and dealing animation tied to server-side receipt timestamps.
-- [ ] Live room gameplay commands, reconnect, durable event/state persistence, and production deployment.
+- [ ] Live room gameplay commands, reconnect, durable multiplayer event/state persistence, and production deployment.
 
 See [README.md](README.md) for commands and [docs/testing.md](docs/testing.md) for the exact coverage boundary. These checks represent foundation progress, not completion of the full game.
 

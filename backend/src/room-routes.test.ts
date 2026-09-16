@@ -15,6 +15,11 @@ describe('private room API', () => {
       const code = first.room.code;
       expect(first.room.viewerSeat).toBe(0);
       expect(first.room.players).toHaveLength(1);
+      const initialEvents = await app.inject(
+        `/api/rooms/${code}/events?token=${first.playerToken}`,
+      );
+      expect(initialEvents.statusCode).toBe(200);
+      expect(initialEvents.json().events[0].type).toBe('room-created');
       const joined = [];
       for (const name of ['North', 'East', 'South']) {
         const response = await app.inject({
@@ -57,6 +62,13 @@ describe('private room API', () => {
           await app.inject(`/api/rooms/${code}?token=${first.playerToken}`)
         ).json().started,
       ).toBe(true);
+      const events = await app.inject(
+        `/api/rooms/${code}/events?token=${first.playerToken}&after=1`,
+      );
+      expect(events.statusCode).toBe(200);
+      expect(
+        events.json().events.map((item: { type: string }) => item.type),
+      ).toContain('player-ready');
       expect(
         (
           await app.inject(`/api/rooms/${code}?token=${joined[0].playerToken}`)
