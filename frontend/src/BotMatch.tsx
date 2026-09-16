@@ -24,11 +24,12 @@ export function BotMatchTable() {
   const [visiblePlays, setVisiblePlays] = useState(0);
   const [pace, setPace] = useState(650);
   const [paused, setPaused] = useState(false);
+  const [dealing, setDealing] = useState(false);
   const [count, setCount] = useState(4);
   const [selected, setSelected] = useState<string[]>([]);
   const [pending, setBusy] = useState(false);
   const animating = snapshot !== null && visiblePlays < snapshot.plays.length;
-  const busy = pending || animating;
+  const busy = pending || animating || dealing;
   const view: BotMatchView | null = !snapshot
     ? null
     : !animating
@@ -80,6 +81,11 @@ export function BotMatchTable() {
     );
     return () => window.clearTimeout(timer);
   }, [animating, paused, pace, visiblePlays, snapshot]);
+  useEffect(() => {
+    if (!dealing) return;
+    const timer = window.setTimeout(() => setDealing(false), 1200);
+    return () => window.clearTimeout(timer);
+  }, [dealing]);
 
   async function request(path: string, body?: unknown) {
     setBusy(true);
@@ -103,6 +109,14 @@ export function BotMatchTable() {
             : 'Could not update the match.',
         );
       const next = botMatchViewSchema.parse(data);
+      if (
+        path === '/api/bot-matches' ||
+        (typeof body === 'object' &&
+          body !== null &&
+          'action' in body &&
+          body.action === 'next-round')
+      )
+        setDealing(true);
       const alreadyShown =
         snapshot?.id === next.id &&
         snapshot.round === next.round &&
@@ -263,6 +277,15 @@ export function BotMatchTable() {
       )}
       {view && (
         <>
+          {dealing && (
+            <div className="deal-banner" role="status" aria-live="polite">
+              <span className="deal-spinner" aria-hidden="true">
+                ♠
+              </span>
+              <strong>Dealing the table…</strong>
+              <span>Cards are dealt counterclockwise.</span>
+            </div>
+          )}
           <div className="bot-scoreboard">
             <strong>
               Round {view.round} · Trick {view.trickNumber}

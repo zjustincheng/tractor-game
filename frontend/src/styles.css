@@ -1253,6 +1253,42 @@ input[type='range'] {
   padding: 0.7rem 0;
   border-top: 1px solid #d3dace;
 }
+.deal-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 1rem 0;
+  padding: 0.8rem 1rem;
+  border: 1px solid #b7caa9;
+  border-radius: 10px;
+  background: #e7f0dc;
+  color: #2b5a3e;
+}
+.deal-banner span:last-child {
+  color: #617565;
+  font-size: 0.84rem;
+}
+.deal-spinner {
+  display: inline-grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  background: #285b43;
+  color: #f6edcf;
+  animation: deal-spin 1s linear infinite;
+}
+@keyframes deal-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .deal-spinner {
+    animation: none;
+  }
+}
 .bot-play {
   animation: bot-play-enter 0.2s ease-out;
 }

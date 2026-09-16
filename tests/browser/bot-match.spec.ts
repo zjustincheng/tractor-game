@@ -10,6 +10,12 @@ test('pauses and skips paced bot turns without enabling human actions early', as
   await table
     .getByRole('button', { name: 'Start bot match', exact: true })
     .click();
+  await expect(
+    table.getByText('Dealing the table…', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    table.getByRole('button', { name: 'Finalize trump' }),
+  ).toBeDisabled();
   const finalize = table.getByRole('button', { name: 'Finalize trump' });
   await expect(finalize).toBeEnabled({ timeout: 12000 });
   await Promise.all([
