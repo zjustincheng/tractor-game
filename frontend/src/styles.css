@@ -1335,6 +1335,11 @@ input[type='range'] {
 .room-status span {
   color: #617565;
 }
+.room-status .room-countdown {
+  color: #8f5e16;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
 .room-settlement {
   display: grid;
   gap: 0.3rem;

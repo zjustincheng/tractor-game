@@ -290,6 +290,15 @@ export function RoomMatch() {
                   : `Turn: seat ${(game.nextSeat ?? 0) + 1}`}
             </strong>
             <span>{game.message}</span>
+            {game.phase === 'declaration' && (
+              <span className="room-countdown" aria-live="polite">
+                {Math.max(
+                  0,
+                  Math.ceil((game.declarationDeadline - clock) / 1000),
+                )}
+                s left
+              </span>
+            )}
           </div>
           {game.settlement && (
             <div className="room-settlement" aria-label="Round settlement">
