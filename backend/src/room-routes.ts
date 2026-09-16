@@ -189,6 +189,24 @@ export function registerRoomRoutes(
   const directory = options.saveDirectory
     ? join(options.saveDirectory, 'rooms')
     : undefined;
+  let ownsLock = false;
+  if (directory) {
+    const lock = join(directory, '.owner.lock');
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    try {
+      const descriptor = openSync(lock, 'wx', 0o600);
+      writeFileSync(descriptor, String(process.pid));
+      closeSync(descriptor);
+      ownsLock = true;
+      app.addHook('onClose', async () => {
+        if (ownsLock && existsSync(lock)) rmSync(lock);
+      });
+    } catch {
+      throw new Error(
+        'Another backend process already owns the room save directory.',
+      );
+    }
+  }
   if (directory) {
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     for (const file of readdirSync(directory)) {

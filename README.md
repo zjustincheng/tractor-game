@@ -89,6 +89,7 @@ Colocate rules/API tests as `*.test.ts`; browser tests use `*.spec.ts`. Use stri
 - `GET /api/config`: supported table sizes, thresholds, and implemented capabilities.
 
 For the supported single-instance deployment, run `./infrastructure/deploy.sh`. It validates Compose, rebuilds both images, starts the stack, and prints service health. The script requires Docker Compose and a persistent Docker volume for `BOT_MATCH_DIR`.
+The backend places an owner lock in the room save directory and refuses a second process on the same volume; use one backend replica until transactional shared storage is introduced.
 
 - `POST /api/practice-preview`: `{ "playerCount": 4, "level": "2", "trumpSuit": "spades" }`. Use `null` for no-suit trump. Returns seat 0's hand, public seat counts, and kitty count; never other hands or buried cards. Preview IDs are informational, not resumable sessions.
 - `GET /api/practice-tricks`: list fixed rule drills.
