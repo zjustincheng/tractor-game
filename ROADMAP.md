@@ -46,7 +46,6 @@ The repository includes playable solo bot matches, a React practice table, a Fas
 - [x] File-backed multiplayer room snapshots with atomic writes and restart recovery.
 - [x] Container health checks and shared match-data volume configuration for single-instance deployment.
 - [x] CI production container build verification and single-instance deployment documentation.
-- [ ] Multi-process coordination and hosted production deployment.
 
 See [README.md](README.md) for commands and [docs/testing.md](docs/testing.md) for the exact coverage boundary. These checks represent foundation progress, not completion of the full game.
 
