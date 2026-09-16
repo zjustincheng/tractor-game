@@ -35,6 +35,7 @@ The repository includes playable solo bot matches, a React practice table, a Fas
 - [x] Deterministic opponent category odds from public counts, own hand, and remaining slots.
 - [x] Room dealing progress uses server-issued start timestamps and fixed rotation duration.
 - [x] Browser coverage for creating a room and rendering the private lobby on desktop and mobile.
+- [x] Repeatable single-instance deployment entrypoint with Compose validation, build, startup, and status output.
 - [ ] Multi-process coordination and hosted production deployment.
 - [x] Live room frontend/lobby, local reconnect polling, and private hand/action controls.
 - [x] Authoritative room transitions between completed tricks, including final-hand completion.

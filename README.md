@@ -87,6 +87,9 @@ Colocate rules/API tests as `*.test.ts`; browser tests use `*.spec.ts`. Use stri
 - `GET /api/rooms/:code/game?token=...`: returns the authorized player's hand and public game state after the room is ready.
 - `POST /api/rooms/:code/game/commands`: `{ "action": "play", "token": "...", "cardIds": ["..."], "revision": 1 }`; validates declaration, timer, kitty, and trick commands per player. The home page includes the create/join lobby and private hand controls.
 - `GET /api/config`: supported table sizes, thresholds, and implemented capabilities.
+
+For the supported single-instance deployment, run `./infrastructure/deploy.sh`. It validates Compose, rebuilds both images, starts the stack, and prints service health. The script requires Docker Compose and a persistent Docker volume for `BOT_MATCH_DIR`.
+
 - `POST /api/practice-preview`: `{ "playerCount": 4, "level": "2", "trumpSuit": "spades" }`. Use `null` for no-suit trump. Returns seat 0's hand, public seat counts, and kitty count; never other hands or buried cards. Preview IDs are informational, not resumable sessions.
 - `GET /api/practice-tricks`: list fixed rule drills.
 - `GET /api/practice-tricks/:id`: return one drill's authorized view.
