@@ -4,12 +4,12 @@ import {
   chooseBotBurial,
   chooseBotLead,
   chooseBotGambleLead,
+  chooseBotDeclaration,
   chooseBotPlay,
   compareComponents,
   createDeck,
   createRound,
   declarationsForHand,
-  declarationRank,
   exchangeKitty,
   nextDealer,
   playCards,
@@ -83,9 +83,12 @@ export function legalDeclarations(
 
 function botDeclarations(state: MatchState, now: number): MatchState {
   for (let seat = 1; seat < state.playerCount; seat++) {
-    const option = legalDeclarations(state, seat).sort(
-      (a, b) => declarationRank(b) - declarationRank(a),
-    )[0];
+    const options = legalDeclarations(state, seat);
+    const option = chooseBotDeclaration(
+      options,
+      state.hands[seat]!,
+      state.levels[state.attackingTeam],
+    );
     if (option)
       state = requireState(receiveDeclaration(state, seat, option, now));
   }

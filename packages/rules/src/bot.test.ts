@@ -5,6 +5,7 @@ import {
   chooseBotPlay,
   chooseBotLead,
   chooseBotGambleLead,
+  chooseBotDeclaration,
   createDeck,
   deal,
   decomposeLead,
@@ -79,6 +80,33 @@ describe('bot follow selection', () => {
     expect(
       chooseBotGambleLead(hand, [[card('A', 'clubs')]], trump, 'attackers'),
     ).toBeNull();
+  });
+  it('prefers a supported suit when declaration strength is tied', () => {
+    const options = [
+      {
+        kind: 'suit' as const,
+        playerSeat: 1,
+        level: '2' as Rank,
+        suit: 'clubs' as Suit,
+        multiplicity: 1,
+        cardIds: ['call-clubs'],
+      },
+      {
+        kind: 'suit' as const,
+        playerSeat: 1,
+        level: '2' as Rank,
+        suit: 'hearts' as Suit,
+        multiplicity: 1,
+        cardIds: ['call-hearts'],
+      },
+    ];
+    const hand = [
+      card('A', 'hearts', 'ha'),
+      card('K', 'hearts', 'hk'),
+      card('Q', 'hearts', 'hq'),
+    ];
+    const choice = chooseBotDeclaration(options, hand, '2');
+    expect(choice?.kind === 'suit' ? choice.suit : null).toBe('hearts');
   });
   it('prefers a fresher category when otherwise equivalent', () => {
     const hand = [card('3', 'clubs', '3c'), card('K', 'hearts', 'kh')];

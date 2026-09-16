@@ -11,6 +11,7 @@ import type { Component } from './components.js';
 import { validateFollow } from './follow.js';
 import { winningComponents } from './gamble.js';
 import { validateGamble } from './gamble.js';
+import type { Declaration } from './declarations.js';
 
 export interface BotPlayContext {
   seat: number;
@@ -103,6 +104,41 @@ export function chooseBotGambleLead(
         .localeCompare(b.cards.map((card) => card.id).join('|')),
   );
   return choices[0]?.cards.map((card) => card.id) ?? null;
+}
+
+/** Rank legal declarations by strength first, then by the amount of matching trump support. */
+export function chooseBotDeclaration(
+  options: readonly Declaration[],
+  hand: readonly Card[],
+  trumpLevel: Declaration['level'],
+): Declaration | null {
+  if (!options.length) return null;
+  const ranked = options.map((option) => {
+    const support =
+      option.kind === 'suit'
+        ? hand.filter(
+            (card) =>
+              card.kind === 'suited' &&
+              card.suit === option.suit &&
+              (card.rank === trumpLevel ||
+                card.rank === 'A' ||
+                card.rank === 'K' ||
+                card.rank === 'Q'),
+          ).length
+        : hand.filter((card) => card.kind === 'joker').length;
+    const jokerBonus = option.kind === 'joker' ? 1000 : 0;
+    return {
+      option,
+      score: jokerBonus + option.multiplicity * 100 + support * 3,
+    };
+  });
+  ranked.sort(
+    (a, b) =>
+      b.score - a.score ||
+      b.option.cardIds.length - a.option.cardIds.length ||
+      a.option.cardIds.join('|').localeCompare(b.option.cardIds.join('|')),
+  );
+  return ranked[0]!.option;
 }
 
 /** Uses only the bot's hand, public lead, and trump; never opponents' hands. */
