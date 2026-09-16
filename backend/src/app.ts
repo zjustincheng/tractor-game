@@ -41,7 +41,7 @@ export function buildApp(
     capabilities: {
       practicePreview: true,
       practiceTricks: true,
-      multiplayer: false,
+      multiplayer: true,
     },
   }));
 

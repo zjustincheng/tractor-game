@@ -5,7 +5,8 @@ services:
       context: ..
       dockerfile: infrastructure/backend.Dockerfile
     init: true
-    volumes: ['bot-matches:/app/data']
+    # One backend instance owns this volume; it stores solo matches and rooms.
+    volumes: ['match-data:/app/data']
     restart: unless-stopped
     healthcheck:
       test:
@@ -43,5 +44,5 @@ services:
       timeout: 3s
       retries: 5
 volumes:
-  bot-matches:
+  match-data:
   postgres-data:

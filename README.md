@@ -39,7 +39,7 @@ You are seat 1 on team A; all remaining seats are bots. Choose **Bot pace** to r
 
 ### Saved matches
 
-The server saves accepted commands before responding. By default, snapshots live in `data/matches` relative to the backend's working directory (`backend/data/matches` with `npm run dev`). Set `BOT_MATCH_DIR` to an absolute path to choose another location, or `:memory:` for disposable sessions. Save files contain all private hands and must remain server-side. They are excluded from Git and container builds.
+The server saves accepted commands before responding. By default, solo snapshots live in `data/matches` relative to the backend's working directory (`backend/data/matches` with `npm run dev`), while multiplayer rooms use the sibling `data/matches/rooms` directory. Set `BOT_MATCH_DIR` to an absolute path to choose another location, or `:memory:` for disposable sessions. Save files contain all private hands and must remain server-side. They are excluded from Git and container builds. A single backend instance must own the save volume until multi-process coordination is added.
 
 Docker Compose uses the `bot-matches` volume, which survives container replacement. Back up the save directory or volume to retain matches elsewhere; deleting the volume deletes its saves. The file store supports one backend process per directory. Invalid saves cause a clear startup failure rather than being silently overwritten. This is snapshot recovery, not a complete event replay system.
 

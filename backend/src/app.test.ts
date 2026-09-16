@@ -21,7 +21,7 @@ describe('practice API', () => {
     expect(response.json().capabilities).toEqual({
       practicePreview: true,
       practiceTricks: true,
-      multiplayer: false,
+      multiplayer: true,
     });
     expect(response.json().modes).toHaveLength(4);
   });
