@@ -18,6 +18,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - run: docker compose -f infrastructure/compose.yaml config --quiet
+      - name: Build production containers
+        run: docker compose -f infrastructure/compose.yaml build --pull=false
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
