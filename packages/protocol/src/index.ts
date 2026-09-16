@@ -262,6 +262,7 @@ export const roomViewSchema = z.strictObject({
   ),
   started: z.boolean(),
 });
+export type RoomView = z.infer<typeof roomViewSchema>;
 export const roomEventsSchema = z.strictObject({
   revision: z.number().int().nonnegative(),
   events: z.array(
@@ -302,6 +303,7 @@ export const roomGameViewSchema = z.strictObject({
   ),
   declarationDeadline: z.number().int(),
   declaration: declarationViewSchema.nullable(),
+  declarationOptions: z.array(declarationViewSchema),
   trump: z
     .strictObject({ level: z.enum(RANKS), suit: z.enum(SUITS).nullable() })
     .nullable(),
@@ -310,3 +312,4 @@ export const roomGameViewSchema = z.strictObject({
   kittyCount: z.number().int().nonnegative(),
   message: z.string(),
 });
+export type RoomGameView = z.infer<typeof roomGameViewSchema>;

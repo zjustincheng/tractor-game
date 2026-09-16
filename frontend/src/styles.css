@@ -1250,6 +1250,120 @@ input[type='range'] {
   border: 1px solid #bfcabd;
   border-radius: 8px;
 }
+.room-panel {
+  margin-top: 1.5rem;
+}
+.room-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.room-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.room-form label {
+  display: grid;
+  gap: 0.3rem;
+  color: #52675a;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+.room-form input,
+.room-form select {
+  min-width: 9rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #bdc9bc;
+  border-radius: 6px;
+  background: #fffdf6;
+  font: inherit;
+}
+.room-join {
+  padding-top: 0.75rem;
+  border-top: 1px solid #d3dace;
+}
+.room-players {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.6rem;
+  margin: 1.15rem 0;
+}
+.room-player {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem;
+  border: 1px dashed #c5cec1;
+  border-radius: 8px;
+  color: #8a968a;
+}
+.room-player.occupied {
+  border-style: solid;
+  background: #f1f4ec;
+  color: #294f3c;
+}
+.room-player small {
+  color: #738175;
+}
+.room-game {
+  margin-top: 1rem;
+}
+.room-status {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.8rem;
+  border-radius: 8px;
+  background: #e7f0dc;
+  color: #2b5a3e;
+}
+.room-status span {
+  color: #617565;
+}
+.room-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.room-options .eyebrow {
+  width: 100%;
+  margin: 0;
+}
+.room-table {
+  display: flex;
+  gap: 1rem;
+  margin: 1rem 0;
+  color: #52675a;
+}
+.room-hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 1rem 0;
+}
+.room-card {
+  min-width: 3.2rem;
+  padding: 0.65rem 0.55rem;
+  border: 1px solid #bdc9bc;
+  border-radius: 7px;
+  background: #fffdf6;
+  color: #294f3c;
+  cursor: pointer;
+}
+.room-card.selected {
+  border-color: #285b43;
+  background: #dcebd2;
+  box-shadow: 0 0 0 2px #9fbea0;
+}
+.error-text {
+  color: #9c3f35;
+}
 .bot-history summary {
   cursor: pointer;
   font-weight: 600;

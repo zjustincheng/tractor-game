@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { BotMatchTable } from './BotMatch.js';
+import { RoomMatch } from './RoomMatch.js';
 import type { CSSProperties, FormEvent } from 'react';
 import {
   advanceLevel,
@@ -635,6 +636,7 @@ export function App() {
         </div>
 
         <BotMatchTable />
+        <RoomMatch />
         <TrickDrills />
 
         <section className="field-notes" id="field-notes">

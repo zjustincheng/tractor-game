@@ -107,6 +107,22 @@ function gameProject(room: Room, viewer: RoomPlayer) {
           cardIds: [...state.declaration.cardIds],
         }
       : null,
+    declarationOptions:
+      state.phase === 'declaration'
+        ? declarationsForHand(
+            state.hands[viewer.seat]!,
+            state.playerCount,
+            state.levels[state.attackingTeam],
+            viewer.seat,
+          ).map((option) => ({
+            kind: option.kind,
+            level: option.level,
+            suit: option.kind === 'suit' ? option.suit : null,
+            joker: option.kind === 'joker' ? option.joker : null,
+            multiplicity: option.multiplicity,
+            cardIds: [...option.cardIds],
+          }))
+        : [],
     trump: state.trump,
     nextSeat: state.trick?.nextSeat ?? null,
     plays:
