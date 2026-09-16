@@ -79,6 +79,10 @@ Colocate rules/API tests as `*.test.ts`; browser tests use `*.spec.ts`. Use stri
 - `POST /api/bot-matches`: `{ "playerCount": 4 }`; creates a solo match.
 - `GET /api/bot-matches/:id`: returns the human hand, public table, legal declaration options, and suggested cards.
 - `POST /api/bot-matches/:id/commands`: `{ "action": "play", "cardIds": ["..."], "revision": 3 }`; actions are `declare`, `bury`, `play`, `advance`, and `next-round`. Stale revisions return 409; rejected moves preserve state.
+- `POST /api/rooms`: `{ "playerCount": 4, "displayName": "Host" }`; creates a private six-character invite room and returns a player token.
+- `POST /api/rooms/:code/join`: `{ "displayName": "Player" }`; assigns the next available seat and returns that player's token.
+- `GET /api/rooms/:code?token=...`: returns the authorized lobby view.
+- `POST /api/rooms/:code/ready`: `{ "token": "...", "ready": true }`; updates the caller's ready state. The room starts when every seat is occupied and ready; gameplay commands are the next multiplayer milestone.
 - `GET /api/config`: supported table sizes, thresholds, and implemented capabilities.
 - `POST /api/practice-preview`: `{ "playerCount": 4, "level": "2", "trumpSuit": "spades" }`. Use `null` for no-suit trump. Returns seat 0's hand, public seat counts, and kitty count; never other hands or buried cards. Preview IDs are informational, not resumable sessions.
 - `GET /api/practice-tricks`: list fixed rule drills.

@@ -13,6 +13,7 @@ import { previewRequestSchema, previewResponseSchema } from '@tractor/protocol';
 import { registerPracticeRoutes } from './practice-routes.js';
 import { registerRoundRoutes } from './round-routes.js';
 import { registerBotRoutes } from './bot-routes.js';
+import { registerRoomRoutes } from './room-routes.js';
 
 export function buildApp(
   options: {
@@ -47,6 +48,7 @@ export function buildApp(
   registerPracticeRoutes(app);
   registerRoundRoutes(app, options);
   registerBotRoutes(app, options);
+  registerRoomRoutes(app, options);
 
   // Stateless practice deal, not a live match. No endpoint exposes the other hands.
   app.post('/api/practice-preview', async (request, reply) => {

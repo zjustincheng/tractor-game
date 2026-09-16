@@ -236,3 +236,29 @@ export const botMatchViewSchema = z.strictObject({
     .nullable(),
 });
 export type BotMatchView = z.infer<typeof botMatchViewSchema>;
+
+export const roomCreateSchema = z.strictObject({
+  playerCount: previewRequestSchema.shape.playerCount,
+  displayName: z.string().trim().min(1).max(32),
+});
+export const roomJoinSchema = z.strictObject({
+  displayName: z.string().trim().min(1).max(32),
+});
+export const roomReadySchema = z.strictObject({
+  token: z.string().uuid(),
+  ready: z.boolean(),
+});
+export const roomViewSchema = z.strictObject({
+  code: z.string().length(6),
+  playerCount: previewRequestSchema.shape.playerCount,
+  hostSeat: z.number().int(),
+  viewerSeat: z.number().int(),
+  players: z.array(
+    z.strictObject({
+      seat: z.number().int(),
+      displayName: z.string(),
+      ready: z.boolean(),
+    }),
+  ),
+  started: z.boolean(),
+});
