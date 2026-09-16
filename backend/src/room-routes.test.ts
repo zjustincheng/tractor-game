@@ -62,6 +62,25 @@ describe('private room API', () => {
           await app.inject(`/api/rooms/${code}?token=${first.playerToken}`)
         ).json().started,
       ).toBe(true);
+      const game = await app.inject(
+        `/api/rooms/${code}/game?token=${first.playerToken}`,
+      );
+      expect(game.statusCode).toBe(200);
+      expect(game.json().phase).toBe('declaration');
+      expect(game.json().hand).toHaveLength(25);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: `/api/rooms/${code}/game/commands`,
+            payload: {
+              action: 'advance',
+              token: joined[0].playerToken,
+              revision: game.json().revision,
+            },
+          })
+        ).statusCode,
+      ).toBe(422);
       const events = await app.inject(
         `/api/rooms/${code}/events?token=${first.playerToken}&after=1`,
       );

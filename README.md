@@ -84,6 +84,8 @@ Colocate rules/API tests as `*.test.ts`; browser tests use `*.spec.ts`. Use stri
 - `GET /api/rooms/:code?token=...`: returns the authorized lobby view.
 - `POST /api/rooms/:code/ready`: `{ "token": "...", "ready": true }`; updates the caller's ready state. The room starts when every seat is occupied and ready; gameplay commands are the next multiplayer milestone.
 - `GET /api/rooms/:code/events?token=...&after=1`: returns room changes after a revision and the caller's current lobby view. Events are public lobby facts only; trick synchronization is the next multiplayer milestone.
+- `GET /api/rooms/:code/game?token=...`: returns the authorized player's hand and public game state after the room is ready.
+- `POST /api/rooms/:code/game/commands`: `{ "action": "play", "token": "...", "cardIds": ["..."], "revision": 1 }`; validates declaration, timer, kitty, and trick commands per player. Live client UI and reconnect handling are next.
 - `GET /api/config`: supported table sizes, thresholds, and implemented capabilities.
 - `POST /api/practice-preview`: `{ "playerCount": 4, "level": "2", "trumpSuit": "spades" }`. Use `null` for no-suit trump. Returns seat 0's hand, public seat counts, and kitty count; never other hands or buried cards. Preview IDs are informational, not resumable sessions.
 - `GET /api/practice-tricks`: list fixed rule drills.

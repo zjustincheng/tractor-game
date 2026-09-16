@@ -6,8 +6,20 @@ import {
   roomReadySchema,
   roomEventsSchema,
   roomViewSchema,
+  roomGameCommandSchema,
+  roomGameViewSchema,
 } from '@tractor/protocol';
-import type { PLAYER_COUNTS } from '@tractor/rules';
+import {
+  advanceDeclaration,
+  createDeck,
+  createRound,
+  declarationsForHand,
+  exchangeKitty,
+  playCards,
+  receiveDeclaration,
+  shuffle,
+} from '@tractor/rules';
+import type { MatchState, PLAYER_COUNTS } from '@tractor/rules';
 
 interface RoomPlayer {
   token: string;
@@ -30,6 +42,8 @@ interface Room {
   createdAt: number;
   revision: number;
   events: RoomEvent[];
+  match?: MatchState;
+  matchRevision: number;
 }
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function code() {
@@ -62,6 +76,52 @@ function project(room: Room, viewer: RoomPlayer) {
     started:
       room.players.length === room.playerCount &&
       room.players.every((player) => player.ready),
+  });
+}
+function gameProject(room: Room, viewer: RoomPlayer) {
+  const state = room.match;
+  if (!state) return null;
+  return roomGameViewSchema.parse({
+    code: room.code,
+    revision: room.matchRevision,
+    viewerSeat: viewer.seat,
+    playerCount: state.playerCount,
+    phase: state.phase,
+    hand: state.hands[viewer.seat],
+    players: state.hands.map((hand, seat) => ({
+      seat,
+      displayName: room.players.find((player) => player.seat === seat)!
+        .displayName,
+      cardCount: hand.length,
+    })),
+    declarationDeadline: state.declarationDeadline,
+    declaration: state.declaration
+      ? {
+          kind: state.declaration.kind,
+          level: state.declaration.level,
+          suit:
+            state.declaration.kind === 'suit' ? state.declaration.suit : null,
+          joker:
+            state.declaration.kind === 'joker' ? state.declaration.joker : null,
+          multiplicity: state.declaration.multiplicity,
+          cardIds: [...state.declaration.cardIds],
+        }
+      : null,
+    trump: state.trump,
+    nextSeat: state.trick?.nextSeat ?? null,
+    plays:
+      state.trick?.plays.map((play) => ({
+        seat: play.seat,
+        cards: play.cards,
+        matchesLead: play.matchesLead,
+      })) ?? [],
+    kittyCount: state.kitty.length,
+    message:
+      state.phase === 'declaration'
+        ? 'Declaration window is open.'
+        : state.phase === 'kitty'
+          ? 'Dealer must exchange the kitty.'
+          : 'Play proceeds counterclockwise.',
   });
 }
 
@@ -99,6 +159,7 @@ export function registerRoomRoutes(
       createdAt: now(),
       revision: 0,
       events: [],
+      matchRevision: 0,
     };
     addEvent(room, {
       type: 'room-created',
@@ -216,7 +277,110 @@ export function registerRoomRoutes(
         seat: player.seat,
         ready: player.ready,
       });
+      if (
+        room.players.length === room.playerCount &&
+        room.players.every((item) => item.ready) &&
+        !room.match
+      ) {
+        room.match = createRound({
+          playerCount: room.playerCount,
+          dealerSeat: 0,
+          attackingTeam: 'A',
+          shoe: shuffle(createDeck(room.playerCount), randomInt),
+          firstDeclarationDeadline: now() + 8000,
+        });
+        room.matchRevision = 1;
+      }
       return project(room, player);
+    },
+  );
+  app.get<{ Params: { code: string }; Querystring: { token?: string } }>(
+    '/api/rooms/:code/game',
+    async (request, reply) => {
+      cleanup();
+      const room = findRoom(rooms, request.params.code);
+      const viewer = authorized(room, request.query.token);
+      const game = room && viewer ? gameProject(room, viewer) : null;
+      if (!game)
+        return reply.code(404).send({
+          code: 'GAME_NOT_READY',
+          message: 'The room is not full and ready yet.',
+        });
+      return game;
+    },
+  );
+  app.post<{ Params: { code: string } }>(
+    '/api/rooms/:code/game/commands',
+    async (request, reply) => {
+      const room = findRoom(rooms, request.params.code);
+      const parsed = roomGameCommandSchema.safeParse(request.body);
+      const viewer = authorized(
+        room,
+        parsed.success ? parsed.data.token : undefined,
+      );
+      if (!room || !viewer || !room.match)
+        return reply.code(404).send({
+          code: 'GAME_NOT_READY',
+          message: 'The room game is not ready.',
+        });
+      if (!parsed.success)
+        return reply.code(400).send({
+          code: 'INVALID_COMMAND',
+          message: 'Provide a valid game command.',
+        });
+      if (parsed.data.revision !== room.matchRevision)
+        return reply.code(409).send({
+          code: 'STALE_REVISION',
+          message: 'Refresh the room before trying again.',
+        });
+      let result: ReturnType<typeof receiveDeclaration>;
+      const state = room.match;
+      if (parsed.data.action === 'declare') {
+        const option = declarationsForHand(
+          state.hands[viewer.seat]!,
+          state.playerCount,
+          state.levels[state.attackingTeam],
+          viewer.seat,
+        ).find(
+          (item) =>
+            item.cardIds.slice().sort().join('|') ===
+            (parsed.data.cardIds ?? []).slice().sort().join('|'),
+        );
+        result = receiveDeclaration(state, viewer.seat, option ?? null, now());
+      } else if (parsed.data.action === 'advance')
+        result = advanceDeclaration(state, now(), randomInt);
+      else if (parsed.data.action === 'bury')
+        result = exchangeKitty(state, parsed.data.cardIds ?? []);
+      else {
+        if (state.phase !== 'tricks' || !state.trick)
+          return reply.code(422).send({
+            code: 'ROUND_NOT_READY',
+            message: 'The trick is not ready.',
+          });
+        const played = playCards(
+          state.trick,
+          viewer.seat,
+          parsed.data.cardIds ?? [],
+        );
+        result = played.ok
+          ? {
+              ok: true,
+              state: {
+                ...state,
+                phase: played.state.status === 'complete' ? 'tricks' : 'tricks',
+                hands: played.state.hands,
+                trick: played.state,
+              },
+            }
+          : { ok: false, code: 'INVALID_DECLARATION', message: played.message };
+      }
+      if (!result.ok)
+        return reply
+          .code(422)
+          .send({ code: result.code, message: result.message });
+      room.match = result.state;
+      room.matchRevision += 1;
+      return gameProject(room, viewer);
     },
   );
 }

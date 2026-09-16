@@ -19,7 +19,7 @@ Run `npm run check` and `npm run test:e2e`. Browser tests require Chromium or an
 
 ## Foundation validation results
 
-- 176 rules/API tests passed, including four complete matches, known-void lead avoidance, private room creation/join/ready flow, revisioned room events, cross-room isolation, validated attacker gambles, suit/rank freshness leads, supported declaration tie-breaking, tactical follows, failed-gamble feedback, snapshot restart recovery, failed writes, corrupt files, and expiry.
+- 176 rules/API tests passed, including four complete matches, private room creation/join/ready flow, private ready-room game projection, revisioned room events, cross-room isolation, known-void lead avoidance, validated attacker gambles, suit/rank freshness leads, supported declaration tie-breaking, tactical follows, failed-gamble feedback, snapshot restart recovery, failed writes, corrupt files, and expiry.
 - Twelve Playwright journeys passed across desktop Chrome and mobile Chrome emulation. Bot journeys cover paced turns, pause/skip controls, per-card dealing progress and lock, a complete round, history, resume after refresh, and starting round two.
 - Formatting, ESLint, TypeScript checks, and both production builds passed.
 - Both container images built; the local stack became healthy. HTTP smoke checks verified the frontend and private preview responses for all four player counts through nginx.
@@ -27,6 +27,6 @@ Run `npm run check` and `npm run test:e2e`. Browser tests require Chromium or an
 
 ## Not implemented yet
 
-Solo matches run the existing follow/gamble engine across successive tricks and rounds. Private room lobbies exist, but rooms do not yet start human gameplay or stream live commands. The system does not implement server-side receipt timestamps for dealing, strong tactical bots, or multi-process storage. Saved snapshots restore across server restarts; tests exercise graceful application restarts and failed writes, not physical power loss. Full-match simulations use legal bot suggestions for the human seat; they do not exhaust every possible human gamble or rule combination. Remaining rule decisions in the decision log still need concrete examples.
+Solo matches run the existing follow/gamble engine across successive tricks and rounds. Ready private rooms now create and accept server-validated gameplay commands, but there is no room gameplay frontend, reconnect flow, or multi-process coordination yet. The system does not implement server-side receipt timestamps for dealing or strong tactical bots. Saved solo snapshots restore across server restarts; tests exercise graceful application restarts and failed writes, not physical power loss. Full-match simulations use legal bot suggestions for the human seat; they do not exhaust every possible human gamble or rule combination. Remaining rule decisions in the decision log still need concrete examples.
 
 Container configuration can be checked with `docker compose -f infrastructure/compose.yaml config --quiet`; a running Docker daemon is required to build and smoke-test images. CI runs code checks and browser tests, but production deployment verification belongs to a later milestone.
