@@ -159,6 +159,7 @@ describe('complete bot matches', () => {
     expect(initial.hand).toEqual(match.state.hands[0]);
     expect(JSON.stringify(initial)).not.toContain('"hands"');
     expect(JSON.stringify(initial)).not.toContain('"kitty":');
+    expect(initial.seenRankCounts).toMatchObject({ '2': 0, A: 0 });
     match = {
       ...match,
       state: {

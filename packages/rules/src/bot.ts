@@ -48,7 +48,14 @@ export function chooseBotLead(
       context.seenCards?.filter(
         (card) => category(card, trump) === component.category,
       ).length ?? 0;
-    const freshness = Math.max(0, 12 - seenInCategory);
+    const seenAtHighEnd =
+      context.seenCards?.filter(
+        (card) =>
+          category(card, trump) === component.category &&
+          effectivePower(card, trump) >= component.highestPower,
+      ).length ?? 0;
+    const freshness =
+      Math.max(0, 12 - seenInCategory) + Math.max(0, 6 - seenAtHighEnd) * 2;
     const score =
       context.role === 'attackers'
         ? structureBonus + trumpBonus + freshness - points

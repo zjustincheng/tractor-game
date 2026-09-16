@@ -5,7 +5,7 @@ import {
   botMatchViewSchema,
   practiceRoundCreateSchema,
 } from '@tractor/protocol';
-import { chooseBotBurial, chooseBotPlay, teamAt } from '@tractor/rules';
+import { chooseBotBurial, chooseBotPlay, teamAt, RANKS } from '@tractor/rules';
 import type { Declaration } from '@tractor/rules';
 import {
   CommandError,
@@ -35,11 +35,17 @@ export function botView(id: string, match: BotMatch, revision: number) {
       : state.hands[0]!;
   const trick = state.trick;
   const seenCounts = { clubs: 0, diamonds: 0, hearts: 0, spades: 0, jokers: 0 };
+  const seenRankCounts = Object.fromEntries(
+    RANKS.map((rank) => [rank, 0]),
+  ) as Record<string, number>;
   for (const card of match.history.flatMap((item) =>
     item.plays.flatMap((play) => [...play.cards]),
   )) {
     if (card.kind === 'joker') seenCounts.jokers += 1;
-    else seenCounts[card.suit] += 1;
+    else {
+      seenCounts[card.suit] += 1;
+      seenRankCounts[card.rank] = (seenRankCounts[card.rank] ?? 0) + 1;
+    }
   }
   const suggestion =
     state.phase === 'kitty' && state.dealerSeat === 0
@@ -63,6 +69,7 @@ export function botView(id: string, match: BotMatch, revision: number) {
         : [];
   return botMatchViewSchema.parse({
     seenCounts,
+    seenRankCounts,
     history: match.history,
     rounds: match.rounds.map(({ round, settlement }) => ({
       round,

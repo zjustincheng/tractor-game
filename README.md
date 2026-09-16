@@ -10,6 +10,8 @@ Bots use deterministic strategies with their own hands and public trick informat
 
 Bots also count cards that have appeared in completed tricks. They use category freshness as a small lead preference, while the **Public cards tracked** panel shows those same public counts for clubs, diamonds, hearts, spades, and jokers.
 
+Expand that panel to see exact printed-rank counts. A count changes only after a completed trick, so it never reveals a player's unplayed hand or buried cards.
+
 ## Run locally
 
 Requires Node.js 24 and npm. Use `nvm use` if you manage Node with nvm.

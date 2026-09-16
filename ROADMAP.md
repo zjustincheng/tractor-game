@@ -25,7 +25,7 @@ The repository includes playable solo bot matches, a React practice table, a Fas
 - [x] Paced bot-play reveals with pause/skip controls, recent trick and round history, durable single-server snapshots, and Docker save volume.
 - [x] Role-aware bot leads that preserve attacker structure and pressure defender scoring near the swap threshold.
 - [x] Deliberate attacker gambles validated against all visible hands before leading.
-- [x] Public completed-trick card counts exposed in the table and used as a deterministic lead freshness signal.
+- [x] Public completed-trick suit and exact printed-rank counts exposed in the table and used as a deterministic lead freshness signal.
 - [x] Advanced bot declaration tie-breaking using matching trump support and level-card density.
 - [ ] Deeper card-counting inference and timed dealing animation.
 - [ ] Live rooms, reconnect, durable event/state persistence, and production deployment.

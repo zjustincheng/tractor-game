@@ -7,6 +7,7 @@ import {
   decomposeLead,
   effectivePower,
   PLAYER_COUNTS,
+  RANKS,
   validateFollow,
 } from '@tractor/rules';
 import type { Card } from '@tractor/rules';
@@ -294,6 +295,16 @@ export function BotMatchTable() {
                 <span key={suit}>
                   <strong>{view.seenCounts[suit]}</strong>{' '}
                   {suit === 'jokers' ? 'jokers' : suit}
+                </span>
+              ))}
+            </div>
+            <div className="rank-tracker" aria-label="Public rank counts">
+              {RANKS.map((rank) => (
+                <span
+                  key={rank}
+                  className={view.seenRankCounts[rank] ? 'seen' : ''}
+                >
+                  <strong>{rank}</strong> {view.seenRankCounts[rank]}
                 </span>
               ))}
             </div>

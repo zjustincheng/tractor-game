@@ -1213,6 +1213,26 @@ input[type='range'] {
 .tracker-grid strong {
   color: #244f3b;
 }
+.rank-tracker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.45rem 0;
+}
+.rank-tracker span {
+  min-width: 2.3rem;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid #d7ddd2;
+  border-radius: 5px;
+  color: #9aa59b;
+  font-size: 0.72rem;
+  text-align: center;
+}
+.rank-tracker span.seen {
+  color: #315943;
+  background: #edf2e9;
+  border-color: #b9cbb6;
+}
 @media (max-width: 760px) {
   .match-identity {
     grid-template-columns: repeat(2, minmax(0, 1fr));
