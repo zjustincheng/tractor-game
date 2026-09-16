@@ -25,6 +25,7 @@ export function BotMatchTable() {
   const [pace, setPace] = useState(650);
   const [paused, setPaused] = useState(false);
   const [dealing, setDealing] = useState(false);
+  const [dealtCount, setDealtCount] = useState(0);
   const [count, setCount] = useState(4);
   const [selected, setSelected] = useState<string[]>([]);
   const [pending, setBusy] = useState(false);
@@ -82,10 +83,16 @@ export function BotMatchTable() {
     return () => window.clearTimeout(timer);
   }, [animating, paused, pace, visiblePlays, snapshot]);
   useEffect(() => {
-    if (!dealing) return;
-    const timer = window.setTimeout(() => setDealing(false), 1200);
-    return () => window.clearTimeout(timer);
-  }, [dealing]);
+    if (!dealing || !snapshot) return;
+    const timer = window.setInterval(() => {
+      setDealtCount((count) => {
+        const next = Math.min(snapshot.hand.length, count + 1);
+        if (next >= snapshot.hand.length) setDealing(false);
+        return next;
+      });
+    }, 42);
+    return () => window.clearInterval(timer);
+  }, [dealing, snapshot]);
 
   async function request(path: string, body?: unknown) {
     setBusy(true);
@@ -117,6 +124,7 @@ export function BotMatchTable() {
           body.action === 'next-round')
       )
         setDealing(true);
+      setDealtCount(0);
       const alreadyShown =
         snapshot?.id === next.id &&
         snapshot.round === next.round &&
@@ -161,6 +169,7 @@ export function BotMatchTable() {
       effectivePower(a, view.trump) - effectivePower(b, view.trump)
     );
   });
+  const displayedHand = dealing ? hand.slice(0, dealtCount) : hand;
   const canPlay = view?.phase === 'tricks' && view.nextSeat === 0;
   const canBury = view?.phase === 'kitty' && view.dealerSeat === 0;
   const teammateSeat = view ? 2 % view.playerCount : 2;
@@ -283,7 +292,15 @@ export function BotMatchTable() {
                 ♠
               </span>
               <strong>Dealing the table…</strong>
-              <span>Cards are dealt counterclockwise.</span>
+              <span>
+                Card {dealtCount} of {snapshot?.hand.length ?? 0} ·
+                counterclockwise
+              </span>
+              <progress
+                value={dealtCount}
+                max={snapshot?.hand.length ?? 1}
+                aria-label="Deal progress"
+              />
             </div>
           )}
           <div className="bot-scoreboard">
@@ -478,7 +495,7 @@ export function BotMatchTable() {
           )}
           {hand.length > 0 && (
             <div className="bot-hand" aria-label="Your match hand">
-              {hand.map((card) => (
+              {displayedHand.map((card) => (
                 <button
                   type="button"
                   key={card.id}
