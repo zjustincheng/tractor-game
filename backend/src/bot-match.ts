@@ -4,6 +4,7 @@ import {
   chooseBotBurial,
   chooseBotLead,
   chooseBotGambleLead,
+  category,
   chooseBotDeclaration,
   chooseBotPlay,
   compareComponents,
@@ -162,6 +163,19 @@ function runBots(match: BotMatch): BotMatch {
                 seenCards: match.history.flatMap((item) =>
                   item.plays.flatMap((play) => [...play.cards]),
                 ),
+                knownVoids: match.history.flatMap((item) => {
+                  const lead = item.plays[0]?.cards[0];
+                  if (!lead) return [];
+                  return item.plays
+                    .slice(1)
+                    .filter(
+                      (play) =>
+                        play.cards[0] &&
+                        category(play.cards[0], item.trump) !==
+                          category(lead, item.trump),
+                    )
+                    .map(() => category(lead, item.trump));
+                }),
               })
             );
           })()

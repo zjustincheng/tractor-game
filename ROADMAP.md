@@ -28,7 +28,8 @@ The repository includes playable solo bot matches, a React practice table, a Fas
 - [x] Public completed-trick suit and exact printed-rank counts exposed in the table and used as a deterministic lead freshness signal.
 - [x] Advanced bot declaration tie-breaking using matching trump support and level-card density.
 - [x] Timed solo dealing phase with control lock, reduced-motion support, and mobile browser coverage.
-- [ ] Deeper card-counting inference and physical per-card dealing animation.
+- [x] Known-void inference from public off-suit plays, bot lead adjustments, and visible void notes.
+- [ ] Deeper probability inference and physical per-card dealing animation.
 - [ ] Live rooms, reconnect, durable event/state persistence, and production deployment.
 
 See [README.md](README.md) for commands and [docs/testing.md](docs/testing.md) for the exact coverage boundary. These checks represent foundation progress, not completion of the full game.

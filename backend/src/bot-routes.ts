@@ -5,7 +5,13 @@ import {
   botMatchViewSchema,
   practiceRoundCreateSchema,
 } from '@tractor/protocol';
-import { chooseBotBurial, chooseBotPlay, teamAt, RANKS } from '@tractor/rules';
+import {
+  category,
+  chooseBotBurial,
+  chooseBotPlay,
+  teamAt,
+  RANKS,
+} from '@tractor/rules';
 import type { Declaration } from '@tractor/rules';
 import {
   CommandError,
@@ -38,6 +44,18 @@ export function botView(id: string, match: BotMatch, revision: number) {
   const seenRankCounts = Object.fromEntries(
     RANKS.map((rank) => [rank, 0]),
   ) as Record<string, number>;
+  const knownVoids = match.history.flatMap((item) => {
+    const lead = item.plays[0]?.cards[0];
+    if (!lead) return [];
+    const leadCategory = category(lead, item.trump);
+    return item.plays
+      .slice(1)
+      .filter(
+        (play) =>
+          play.cards[0] && category(play.cards[0], item.trump) !== leadCategory,
+      )
+      .map((play) => ({ seat: play.seat, category: leadCategory }));
+  });
   for (const card of match.history.flatMap((item) =>
     item.plays.flatMap((play) => [...play.cards]),
   )) {
@@ -70,6 +88,7 @@ export function botView(id: string, match: BotMatch, revision: number) {
   return botMatchViewSchema.parse({
     seenCounts,
     seenRankCounts,
+    knownVoids,
     history: match.history,
     rounds: match.rounds.map(({ round, settlement }) => ({
       round,

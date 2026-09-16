@@ -161,6 +161,12 @@ export const botMatchViewSchema = z.strictObject({
     jokers: z.number().int().nonnegative(),
   }),
   seenRankCounts: z.record(z.enum(RANKS), z.number().int().nonnegative()),
+  knownVoids: z.array(
+    z.strictObject({
+      seat: z.number().int().nonnegative(),
+      category: z.string(),
+    }),
+  ),
   history: z
     .array(
       z.strictObject({

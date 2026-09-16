@@ -1233,6 +1233,11 @@ input[type='range'] {
   background: #edf2e9;
   border-color: #b9cbb6;
 }
+.void-notes {
+  display: block;
+  margin-top: 0.25rem;
+  color: #765817;
+}
 @media (max-width: 760px) {
   .match-identity {
     grid-template-columns: repeat(2, minmax(0, 1fr));

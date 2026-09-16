@@ -12,6 +12,8 @@ Bots also count cards that have appeared in completed tricks. They use category 
 
 Expand that panel to see exact printed-rank counts. A count changes only after a completed trick, so it never reveals a player's unplayed hand or buried cards.
 
+When a player fails to follow the led category, the tracker records a known void for that seat. Bots use this public information to avoid risky attacker leads and to pressure likely-void categories when defending.
+
 ## Run locally
 
 Requires Node.js 24 and npm. Use `nvm use` if you manage Node with nvm.

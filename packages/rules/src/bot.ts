@@ -25,6 +25,7 @@ export interface BotLeadContext {
   defenderScore: number;
   swapThreshold: number;
   seenCards?: readonly Card[];
+  knownVoids?: readonly string[];
 }
 
 /** Choose a deterministic lead using basic score and structure priorities. */
@@ -56,12 +57,21 @@ export function chooseBotLead(
       ).length ?? 0;
     const freshness =
       Math.max(0, 12 - seenInCategory) + Math.max(0, 6 - seenAtHighEnd) * 2;
+    const voidCount =
+      context.knownVoids?.filter((value) => value === component.category)
+        .length ?? 0;
+    const voidAdjustment =
+      context.role === 'attackers' ? -voidCount * 20 : voidCount * 5;
     const score =
       context.role === 'attackers'
-        ? structureBonus + trumpBonus + freshness - points
+        ? structureBonus + trumpBonus + freshness + voidAdjustment - points
         : nearThreshold
-          ? points * 10 + structureBonus + trumpBonus + freshness
-          : structureBonus + trumpBonus + freshness - points;
+          ? points * 10 +
+            structureBonus +
+            trumpBonus +
+            freshness +
+            voidAdjustment
+          : structureBonus + trumpBonus + freshness + voidAdjustment - points;
     return { component, score };
   });
   ranked.sort(

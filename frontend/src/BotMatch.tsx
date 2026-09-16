@@ -335,6 +335,17 @@ export function BotMatchTable() {
               Counts include cards played in completed tricks. Unseen cards may
               still be anywhere.
             </small>
+            {view.knownVoids.length > 0 && (
+              <small className="void-notes">
+                Known voids:{' '}
+                {view.knownVoids
+                  .map(
+                    (voidInfo) =>
+                      `Seat ${voidInfo.seat + 1} has no ${voidInfo.category}`,
+                  )
+                  .join(' · ')}
+              </small>
+            )}
           </details>
           <p role="status">{view.message}</p>
           <div

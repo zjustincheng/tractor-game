@@ -122,6 +122,17 @@ describe('bot follow selection', () => {
       }),
     ).toEqual(['kh']);
   });
+  it('avoids an attacker lead where an opponent is known void', () => {
+    const hand = [card('3', 'clubs', '3c'), card('K', 'hearts', 'kh')];
+    expect(
+      chooseBotLead(hand, trump, {
+        role: 'attackers',
+        defenderScore: 0,
+        swapThreshold: 80,
+        knownVoids: ['clubs'],
+      }),
+    ).toEqual(['kh']);
+  });
   it('beats an opponent with the cheapest winning single', () => {
     expect(
       select([card('3'), card('10'), card('K'), card('A')], [card('9')], false),
