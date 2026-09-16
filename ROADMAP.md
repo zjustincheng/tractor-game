@@ -34,7 +34,8 @@ The repository includes playable solo bot matches, a React practice table, a Fas
 - [x] Ready rooms create a private server-authoritative deal and accept revision-checked declaration, timer, kitty, and trick commands.
 - [ ] Deeper probability inference and dealing animation tied to server-side receipt timestamps.
 - [x] Live room frontend/lobby, local reconnect polling, and private hand/action controls.
-- [ ] Durable multiplayer event/state persistence, complete trick/round transitions, and production deployment.
+- [x] Authoritative room transitions between completed tricks, including final-hand completion.
+- [ ] Durable multiplayer event/state persistence, round settlement, and production deployment.
 
 See [README.md](README.md) for commands and [docs/testing.md](docs/testing.md) for the exact coverage boundary. These checks represent foundation progress, not completion of the full game.
 

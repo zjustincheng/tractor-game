@@ -282,7 +282,7 @@ export const roomEventsSchema = z.strictObject({
   room: roomViewSchema,
 });
 export const roomGameCommandSchema = z.strictObject({
-  action: z.enum(['declare', 'advance', 'bury', 'play']),
+  action: z.enum(['declare', 'advance', 'bury', 'play', 'next-trick']),
   token: z.string().uuid(),
   cardIds: z.array(z.string().min(1).max(100)).max(36).optional(),
   revision: z.number().int().nonnegative(),
@@ -308,6 +308,8 @@ export const roomGameViewSchema = z.strictObject({
     .strictObject({ level: z.enum(RANKS), suit: z.enum(SUITS).nullable() })
     .nullable(),
   nextSeat: z.number().int().nullable(),
+  winnerSeat: z.number().int().nullable(),
+  trickComplete: z.boolean(),
   plays: exerciseViewSchema.shape.plays,
   kittyCount: z.number().int().nonnegative(),
   message: z.string(),

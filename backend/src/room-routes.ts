@@ -16,6 +16,7 @@ import {
   declarationsForHand,
   exchangeKitty,
   playCards,
+  nextTrick,
   receiveDeclaration,
   shuffle,
 } from '@tractor/rules';
@@ -125,6 +126,8 @@ function gameProject(room: Room, viewer: RoomPlayer) {
         : [],
     trump: state.trump,
     nextSeat: state.trick?.nextSeat ?? null,
+    winnerSeat: state.trick?.winnerSeat ?? null,
+    trickComplete: state.trick?.status === 'complete',
     plays:
       state.trick?.plays.map((play) => ({
         seat: play.seat,
@@ -367,7 +370,20 @@ export function registerRoomRoutes(
         result = advanceDeclaration(state, now(), randomInt);
       else if (parsed.data.action === 'bury')
         result = exchangeKitty(state, parsed.data.cardIds ?? []);
-      else {
+      else if (parsed.data.action === 'next-trick') {
+        if (!state.trick || state.trick.status !== 'complete')
+          return reply.code(422).send({
+            code: 'ROUND_NOT_READY',
+            message: 'Complete the current trick first.',
+          });
+        const handsEmpty = state.hands.every((hand) => hand.length === 0);
+        result = {
+          ok: true,
+          state: handsEmpty
+            ? { ...state, phase: 'finished' }
+            : { ...state, trick: nextTrick(state.trick) },
+        };
+      } else {
         if (state.phase !== 'tricks' || !state.trick)
           return reply.code(422).send({
             code: 'ROUND_NOT_READY',

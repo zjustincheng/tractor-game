@@ -121,7 +121,7 @@ export function RoomMatch() {
     };
   }, [room?.code, token, revision]);
   async function command(
-    action: 'ready' | 'declare' | 'advance' | 'bury' | 'play',
+    action: 'ready' | 'declare' | 'advance' | 'bury' | 'play' | 'next-trick',
     cardIds?: string[],
   ) {
     if (!room || !token) return;
@@ -344,6 +344,15 @@ export function RoomMatch() {
                   onClick={() => void command('play', selectedIds)}
                 >
                   Play selected
+                </button>
+              )}
+              {game.phase === 'tricks' && game.trickComplete && (
+                <button
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={() => void command('next-trick')}
+                >
+                  {game.hand.length === 0 ? 'Finish round' : 'Next trick'}
                 </button>
               )}
             </>
