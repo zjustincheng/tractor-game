@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { buildApp } from './app.js';
 
 describe('private room API', () => {
@@ -109,4 +112,31 @@ describe('private room API', () => {
       await app.close();
     }
   });
+});
+
+it('restores a room and player session after a backend restart', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'tractor-room-'));
+  let app = buildApp({ saveDirectory: directory });
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/rooms',
+    payload: { playerCount: 4, displayName: 'Persistent Host' },
+  });
+  const snapshot = created.json();
+  await app.close();
+  app = buildApp({ saveDirectory: directory });
+  try {
+    const restored = await app.inject(
+      `/api/rooms/${snapshot.room.code}?token=${snapshot.playerToken}`,
+    );
+    expect(restored.statusCode).toBe(200);
+    expect(restored.json()).toMatchObject({
+      code: snapshot.room.code,
+      viewerSeat: 0,
+      players: [{ seat: 0, displayName: 'Persistent Host', ready: false }],
+    });
+  } finally {
+    await app.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
