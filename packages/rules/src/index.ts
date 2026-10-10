@@ -8,3 +8,5 @@ export * from './trick.js';
 export * from './declarations.js';
 export * from './match.js';
 export * from './bot.js';
+export * from './belief.js';
+export * from './belief-deals.js';

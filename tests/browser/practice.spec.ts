@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('deals each table size, selects cards, and clears the hand selection', async ({
   page,
 }, testInfo) => {
-  await page.goto('/');
+  await page.goto('/tutorial');
   await expect(
     page.getByRole('heading', { name: '25 cards. A little possibility.' }),
   ).toBeVisible();
@@ -42,7 +42,7 @@ test('deals each table size, selects cards, and clears the hand selection', asyn
 });
 
 test('uses no-suit trump and deck-scaled scoring', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/tutorial');
   await expect(
     page.getByRole('button', { name: 'Deal a sample hand' }),
   ).toBeEnabled();
@@ -73,7 +73,7 @@ test('shows an actionable connection failure and retries', async ({ page }) => {
   await page.route('**/api/practice-preview', (route) =>
     route.fulfill({ status: 503, body: '{}' }),
   );
-  await page.goto('/');
+  await page.goto('/tutorial');
   await expect(page.getByRole('alert')).toContainText(
     'Could not reach the table',
   );
@@ -86,7 +86,7 @@ test('shows an actionable connection failure and retries', async ({ page }) => {
 test('opens a server-judged trick drill and explains an illegal selection', async ({
   page,
 }) => {
-  await page.goto('/');
+  await page.goto('/tutorial');
   await expect(
     page.getByRole('heading', { name: 'Play the tricky parts.' }),
   ).toBeVisible();

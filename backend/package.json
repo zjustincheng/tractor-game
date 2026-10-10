@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "esbuild src/server.ts --bundle --platform=node --target=node24 --format=esm --external:fastify --external:zod --outfile=dist/server.js",
+    "build": "esbuild src/server.ts --bundle --platform=node --target=node24 --format=esm --external:fastify --external:zod --external:pg --outfile=dist/server.js",
     "start": "node dist/server.js"
   },
   "dependencies": {

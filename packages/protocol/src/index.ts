@@ -104,6 +104,21 @@ export const practiceRoundCreateSchema = z.strictObject({
   playerCount: z.union(PLAYER_COUNTS.map((count) => z.literal(count))),
   attackingTeam: z.enum(['A', 'B']).default('A'),
 });
+export const botDifficultySchema = z.enum([
+  'relaxed',
+  'standard',
+  'sharp',
+  'expert',
+]);
+export const botMatchCreateSchema = z.strictObject({
+  playerCount: z.union(PLAYER_COUNTS.map((count) => z.literal(count))),
+  difficulty: botDifficultySchema.default('standard'),
+  playtest: z.boolean().default(false),
+  quickMatch: z.boolean().default(false),
+  languageModel: z.boolean().default(false),
+  previousModelMatchId: z.uuid().optional(),
+  previousPlaytestId: z.uuid().optional(),
+});
 export const declarationViewSchema = z.strictObject({
   kind: z.enum(['suit', 'joker']),
   level: z.enum(RANKS),
@@ -152,7 +167,73 @@ export const botCommandSchema = z.strictObject({
   action: z.enum(['declare', 'bury', 'play', 'advance', 'next-round']),
   cardIds: z.array(z.string().min(1).max(100)).max(36).optional(),
 });
+export const botFeedbackSchema = z.strictObject({
+  revision: z.number().int().nonnegative(),
+  sampleId: z.string().uuid(),
+  preferredIndex: z.number().int().nonnegative(),
+});
+export const botReviewSchema = z.strictObject({
+  revision: z.number().int().nonnegative(),
+});
+export const BOT_DEAL_CARD_INTERVAL_MS = 400;
+
 export const botMatchViewSchema = z.strictObject({
+  languageModel: z
+    .object({
+      model: z.string(),
+      decisions: z.number().int().nonnegative(),
+      previousMatchId: z.string().uuid().nullable(),
+      record: z.object({
+        humanWins: z.number().int().nonnegative(),
+        modelWins: z.number().int().nonnegative(),
+        matches: z.number().int().nonnegative(),
+      }),
+    })
+    .nullable()
+    .optional(),
+  playtest: z
+    .object({
+      opponent: z.enum(['sharp', 'champion']).nullable(),
+      championId: z.string().nullable(),
+      previousPlaytestId: z.string().uuid().nullable().optional(),
+      feedbackCount: z.number().int().nonnegative(),
+      review: z.array(
+        z.strictObject({
+          id: z.string().uuid(),
+          seat: z.number().int(),
+          kind: z.enum(['lead', 'follow', 'declaration', 'burial']),
+          options: z.array(
+            z.strictObject({
+              cards: z.array(z.string()),
+              cardIds: z.array(z.string()),
+            }),
+          ),
+          chosen: z.number().int(),
+          preferredIndex: z.number().int().nullable(),
+          round: z.number().int().nullable(),
+          trick: z.number().int().nullable(),
+          clip: z
+            .object({
+              decisionIndex: z.number().int().nonnegative(),
+              seatCorrected: z.boolean(),
+              seat: z.number().int().nonnegative(),
+              hand: z.array(z.string()).nullable(),
+              trump: z.string(),
+              points: z.number().int(),
+              winnerSeat: z.number().int(),
+              plays: z.array(
+                z.object({
+                  seat: z.number().int(),
+                  cards: z.array(z.string()),
+                }),
+              ),
+            })
+            .nullable(),
+        }),
+      ),
+    })
+    .nullable(),
+  difficulty: botDifficultySchema,
   seenCounts: z.strictObject({
     clubs: z.number().int().nonnegative(),
     diamonds: z.number().int().nonnegative(),
@@ -202,6 +283,7 @@ export const botMatchViewSchema = z.strictObject({
   id: z.string().uuid(),
   revision: z.number().int(),
   playerCount: previewRequestSchema.shape.playerCount,
+  quickMatch: z.boolean().default(false),
   phase: practiceRoundViewSchema.shape.phase,
   round: z.number().int(),
   trickNumber: z.number().int(),
@@ -209,6 +291,7 @@ export const botMatchViewSchema = z.strictObject({
   attackingTeam: z.enum(['A', 'B']),
   dealerSeat: z.number().int(),
   defenderScore: z.number().int(),
+  dealingStartedAt: z.number().int().nullable().default(null),
   declarationDeadline: z.number().int(),
   declaration: declarationViewSchema
     .extend({ playerSeat: z.number().int() })
@@ -283,6 +366,7 @@ export const roomEventsSchema = z.strictObject({
   room: roomViewSchema,
 });
 export const roomGameCommandSchema = z.strictObject({
+  requestId: z.string().uuid().optional(),
   action: z.enum([
     'declare',
     'advance',

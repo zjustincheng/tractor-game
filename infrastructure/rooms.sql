@@ -1,5 +1,5 @@
--- Planned shared-store schema for multi-process room ownership.
--- Runtime currently uses atomic JSON snapshots and a single-owner lock.
+-- Shared room storage. revision orders all committed mutations; lobby and
+-- game revisions remain separate inside payload. Events are server-private.
 create table if not exists tractor_rooms (
   code text primary key,
   payload jsonb not null,

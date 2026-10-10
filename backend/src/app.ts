@@ -13,14 +13,22 @@ import { previewRequestSchema, previewResponseSchema } from '@tractor/protocol';
 import { registerPracticeRoutes } from './practice-routes.js';
 import { registerRoundRoutes } from './round-routes.js';
 import { registerBotRoutes } from './bot-routes.js';
+import type { RoomRepository } from './room-repository.js';
+import type { Room } from './room-routes.js';
 import { registerRoomRoutes } from './room-routes.js';
+import type { BotPolicy } from './bot-policy.js';
+import type { LanguageModelClient } from './language-model.js';
 
 export function buildApp(
   options: {
     logger?: boolean;
+    botPolicy?: BotPolicy;
+    languageModel?: LanguageModelClient;
     pickIndex?: (maximum: number) => number;
     now?: () => number;
     saveDirectory?: string;
+    databaseUrl?: string;
+    roomRepository?: RoomRepository<Room>;
   } = {},
 ) {
   const app = Fastify({ logger: options.logger ?? false, bodyLimit: 4096 });
@@ -34,9 +42,11 @@ export function buildApp(
   app.get('/api/health', async () => ({
     status: 'ok',
     rulesVersion: RULES_VERSION,
-    multiplayerPersistence: options.saveDirectory
-      ? 'file-single-instance'
-      : 'memory',
+    multiplayerPersistence: options.databaseUrl
+      ? 'postgres'
+      : options.saveDirectory
+        ? 'file-single-instance'
+        : 'memory',
   }));
   app.get('/api/config', async () => ({
     rulesVersion: RULES_VERSION,
@@ -45,9 +55,11 @@ export function buildApp(
       practicePreview: true,
       practiceTricks: true,
       multiplayer: true,
-      multiplayerPersistence: options.saveDirectory
-        ? 'file-single-instance'
-        : 'memory',
+      multiplayerPersistence: options.databaseUrl
+        ? 'postgres'
+        : options.saveDirectory
+          ? 'file-single-instance'
+          : 'memory',
     },
   }));
 

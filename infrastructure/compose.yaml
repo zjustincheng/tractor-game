@@ -5,7 +5,9 @@ services:
       context: ..
       dockerfile: infrastructure/backend.Dockerfile
     init: true
-    # One backend instance owns this volume; it stores solo matches and rooms.
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-}
+    # Solo saves still require one owner; PostgreSQL shares multiplayer rooms only.
     volumes: ['match-data:/app/data']
     restart: unless-stopped
     healthcheck:
@@ -28,7 +30,7 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
-  # Reserved for the persistence milestone; the practice API does not use a DB.
+  # Optional shared room persistence. Set DATABASE_URL to connect the backend.
   postgres:
     image: postgres:18-alpine
     profiles: ['persistence']

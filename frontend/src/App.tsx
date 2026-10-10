@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { BotMatchTable } from './BotMatch.js';
 import { RoomMatch } from './RoomMatch.js';
+import { TrumpTrainer } from './TrumpTrainer.js';
+import { ReplayViewer } from './ReplayViewer.js';
 import type { CSSProperties, FormEvent } from 'react';
 import {
   advanceLevel,
@@ -27,6 +29,8 @@ import type {
   PreviewRequest,
   PreviewResponse,
 } from '@tractor/protocol';
+
+const TRAINING_UI_ENABLED = import.meta.env.VITE_SHOW_TRAINING_TOOLS === 'true';
 
 const suitSymbols: Record<Suit, string> = {
   clubs: '♣',
@@ -151,6 +155,12 @@ function Table({ preview }: { preview: PreviewResponse | null }) {
 function TrickDrills() {
   const [list, setList] = useState<ExerciseSummary[]>([]);
   const [exercise, setExercise] = useState<ExerciseView | null>(null);
+  const [completed, setCompleted] = useState<Set<string>>(
+    () =>
+      new Set(
+        JSON.parse(localStorage.getItem('tractor-drills-completed') ?? '[]'),
+      ),
+  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -195,11 +205,34 @@ function TrickDrills() {
       setExercise(result.view);
       setSelected(new Set());
       setMessage(result.message);
+      if (result.view.status === 'complete') {
+        setCompleted((old) => {
+          const next = new Set(old).add(result.view.id);
+          localStorage.setItem(
+            'tractor-drills-completed',
+            JSON.stringify([...next]),
+          );
+          return next;
+        });
+      }
     } catch {
       setMessage('Could not submit that play.');
     } finally {
       setBusy(false);
     }
+  }
+  const nextExercise = exercise
+    ? list[
+        (list.findIndex((item) => item.id === exercise.id) + 1) % list.length
+      ]
+    : null;
+  function showAll() {
+    setExercise(null);
+    setSelected(new Set());
+    setMessage('');
+  }
+  function resetExercise() {
+    if (exercise) void choose(exercise.id);
   }
   return (
     <section className="drills panel" id="trick-drills">
@@ -212,21 +245,17 @@ function TrickDrills() {
             selection.
           </p>
         </div>
-        {exercise && (
-          <button
-            className="text-button"
-            type="button"
-            onClick={() => {
-              setExercise(null);
-              setMessage('');
-            }}
-          >
-            All drills
+        {exercise ? (
+          <button className="text-button" type="button" onClick={showAll}>
+            All drills · {completed.size}/{list.length} complete
           </button>
-        )}
+        ) : null}
       </div>
       {!exercise ? (
         <div className="drill-list">
+          <p className="drill-progress" aria-live="polite">
+            {completed.size} of {list.length} drills completed
+          </p>
           {list.map((item, index) => (
             <button
               type="button"
@@ -242,7 +271,9 @@ function TrickDrills() {
                 <strong>{item.title}</strong>
                 <small>{item.description}</small>
               </span>
-              <span aria-hidden="true">↗</span>
+              <span aria-hidden="true">
+                {completed.has(item.id) ? '✓' : '↗'}
+              </span>
             </button>
           ))}
         </div>
@@ -280,6 +311,26 @@ function TrickDrills() {
             {busy ? 'Checking…' : 'Play selected cards'}
             <span aria-hidden="true">↗</span>
           </button>
+          <div className="drill-actions">
+            <button
+              className="text-button"
+              type="button"
+              onClick={resetExercise}
+              disabled={busy}
+            >
+              Try again
+            </button>
+            {exercise.status === 'complete' && nextExercise && (
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => void choose(nextExercise.id)}
+                disabled={busy}
+              >
+                Next drill ↗
+              </button>
+            )}
+          </div>
           {message && (
             <p className="drill-message" aria-live="polite">
               {message}
@@ -291,7 +342,7 @@ function TrickDrills() {
   );
 }
 
-export function App() {
+export function TutorialPage() {
   const [draft, setDraft] = useState<PreviewRequest>(initialSettings);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -390,10 +441,11 @@ export function App() {
           </span>
         </a>
         <div className="header-right">
-          <a href="#bot-match">Play against bots</a>
+          <a href="/">Play the game</a>
           <a href="#field-notes">
             How it works <span aria-hidden="true">↗</span>
           </a>
+          <a href="/replay">Replays</a>
           <span className="preview-badge">Solo play</span>
         </div>
       </header>
@@ -635,9 +687,8 @@ export function App() {
           </div>
         </div>
 
-        <BotMatchTable />
-        <RoomMatch />
-        <TrickDrills />
+        {TRAINING_UI_ENABLED && <TrickDrills />}
+        {TRAINING_UI_ENABLED && <TrumpTrainer />}
 
         <section className="field-notes" id="field-notes">
           <div>
@@ -685,5 +736,63 @@ export function App() {
         <span>Made for a table full of people.</span>
       </footer>
     </div>
+  );
+}
+
+function GamePage() {
+  return (
+    <div className="app-shell">
+      <header className="site-header">
+        <a className="brand" href="/" aria-label="Tractor home">
+          <span className="brand-mark" aria-hidden="true">
+            ♠
+          </span>
+          <span>
+            tractor<span className="brand-subtitle">升级 / 拖拉机</span>
+          </span>
+        </a>
+        <div className="header-right">
+          <a href="/tutorial">
+            Tutorials <span aria-hidden="true">↗</span>
+          </a>
+          <a href="/replay">
+            Replays <span aria-hidden="true">↗</span>
+          </a>
+          <a className="preview-badge" href="#play-room">
+            Play with friends
+          </a>
+        </div>
+      </header>
+      <main>
+        <section className="page-intro game-intro">
+          <div>
+            <p className="eyebrow">THE PARTNERSHIP CARD GAME</p>
+            <h1>Find your table.</h1>
+            <p>Play against bots or invite people to a private room.</p>
+          </div>
+        </section>
+        <BotMatchTable />
+        <RoomMatch />
+      </main>
+      <footer className="site-footer">
+        <span>
+          tractor{' '}
+          <span className="footer-suits" aria-hidden="true">
+            ♣ ♦ ♥ ♠
+          </span>
+        </span>
+        <span>Made for a table full of people.</span>
+      </footer>
+    </div>
+  );
+}
+
+export function App() {
+  return window.location.pathname === '/tutorial' ? (
+    <TutorialPage />
+  ) : window.location.pathname === '/replay' ? (
+    <ReplayViewer />
+  ) : (
+    <GamePage />
   );
 }

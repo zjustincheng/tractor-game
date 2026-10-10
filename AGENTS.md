@@ -1,33 +1,27 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+## Project structure
 
-This repository (`tractor-game`) is currently an empty Git repository. No application code, tests, assets, or dependency manifests have been added yet. Update this guide as the project takes shape.
+This is a TypeScript npm workspace for Tractor (升级 / 拖拉机). `frontend/` contains the React/Vite browser app, `backend/` the Fastify API and persistence, `packages/rules/` pure game logic, and `packages/protocol/` shared validated schemas. Browser tests live in `tests/browser/`; rules and API tests are colocated as `*.test.ts`. Deployment files and SQL live in `infrastructure/`, supporting scripts in `scripts/`, and rule decisions and architecture notes in `docs/`.
 
-When introducing the initial implementation, keep source code, tests, and game assets clearly separated. Suggested directories are `src/`, `tests/`, and `assets/`; adapt these to the chosen framework. Add a `README.md` describing the game, prerequisites, and local setup.
+Keep network, database, clock, and random-number access outside the pure rules package. The server validates moves and projects only the requesting player's hand and permitted public state. Changes to game rules must follow `docs/rules-decisions.md` and the supplied specification.
 
-## Build, Test, and Development Commands
+## Commands
 
-No build system, development server, or test runner is configured. Do not assume commands such as `npm test` or `make build` are available.
+Use Node.js 24 and `npm ci`. Run `npm run dev` for local development, `npm run check` for formatting, lint, typecheck, unit/API tests, and builds, and `npm run test:e2e` for browser tests. Install Chromium with `npx playwright install chromium`, or use `PLAYWRIGHT_CHANNEL=chrome` for local Chrome. Override `E2E_WEB_PORT` and `E2E_API_PORT` when development servers occupy default ports.
 
-When adding tooling, document the exact installation, development, build, and test commands in `README.md`. Prefer repository-defined scripts so contributors and automation use the same commands. Commit the appropriate dependency lockfile when supported.
+`TEST_DATABASE_URL=... npm run test:postgres` verifies PostgreSQL storage using isolated temporary schemas in a test database. PostgreSQL is optional for normal local play. See `README.md` for exact setup and configuration.
 
-## Coding Style & Naming Conventions
+## Style and testing
 
-No language, indentation standard, formatter, or linter has been selected. Follow the conventions of the chosen language and framework, and configure formatting and linting alongside the first implementation.
+Use strict TypeScript, descriptive names, two-space indentation, Prettier, and ESLint. Keep modules focused and avoid unrelated refactoring. Run `npm run format` after edits; `AGENTS.md` is intentionally excluded from formatting. Commit the dependency lockfile when changing dependencies.
 
-Use descriptive names for modules, functions, and assets. Keep each module focused on one responsibility. Avoid mixing unrelated refactoring with feature changes.
+Favor deterministic rule and state-transition tests. Persistence changes must cover concurrent mutations, rejected commands, rollback, and recovery. Visual or interactive changes need relevant browser coverage and recorded verification. Document coverage boundaries in `docs/testing.md`.
 
-## Testing Guidelines
+## Commits and pull requests
 
-There is no testing framework or coverage threshold yet. Introduce tests with meaningful game logic, following the selected framework's file naming conventions. Document how to run them, and favor deterministic tests for rules and state changes. For visual or interactive changes, record the manual checks performed.
+Use concise imperative subjects and focused commits. Explain the problem and resulting behavior, list verification, and link issues when relevant. Include screenshots for visible changes and state setup changes or known limitations.
 
-## Commit & Pull Request Guidelines
+## Security and configuration
 
-There is no commit history from which to infer conventions. Use concise, imperative commit subjects, such as `Add tractor movement controls`, and keep commits focused.
-
-Pull requests should explain the change, list verification performed, and link relevant issues when available. Include screenshots or short recordings for visible gameplay or interface changes. State any setup changes or known limitations.
-
-## Security & Configuration
-
-Do not commit secrets, local credentials, generated build output, or installed dependencies. Add appropriate `.gitignore` rules when introducing tooling, and document required configuration with safe example values.
+Never commit secrets, credentials, generated output, dependencies, or saved hands. Room tokens and private database events stay server-side except for the requesting player's session token. PostgreSQL shares multiplayer rooms only; solo snapshots still require a single process per save directory. Production hosting, TLS, backups, and paid provisioning require separate scope.

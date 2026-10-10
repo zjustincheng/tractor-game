@@ -6,6 +6,7 @@ import {
   roomViewSchema,
 } from '@tractor/protocol';
 import type { Card } from '@tractor/rules';
+import { RANKS, SUITS } from '@tractor/rules';
 import type { RoomGameView, RoomView } from '@tractor/protocol';
 
 const tokenKey = 'tractor-room-token';
@@ -14,6 +15,15 @@ function label(card: Card) {
   return card.kind === 'joker'
     ? `${card.joker === 'big' ? 'Big' : 'Small'} joker`
     : `${card.rank}${card.suit[0]?.toUpperCase()}`;
+}
+function sortHand(cards: readonly Card[]) {
+  return [...cards].sort((a, b) => {
+    const suitA = a.kind === 'joker' ? SUITS.length : SUITS.indexOf(a.suit);
+    const suitB = b.kind === 'joker' ? SUITS.length : SUITS.indexOf(b.suit);
+    const rankA = a.kind === 'joker' ? 0 : RANKS.indexOf(a.rank);
+    const rankB = b.kind === 'joker' ? 0 : RANKS.indexOf(b.rank);
+    return suitA - suitB || rankA - rankB || a.id.localeCompare(b.id);
+  });
 }
 
 export function RoomMatch() {
@@ -28,21 +38,30 @@ export function RoomMatch() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [connection, setConnection] = useState<'connected' | 'reconnecting'>(
+    'connected',
+  );
   const [revision, setRevision] = useState(0);
   const [clock, setClock] = useState(() => Date.now());
   const pollSequence = useRef(0);
 
-  const request = async (path: string, body?: unknown) => {
-    const response = await fetch(
-      path,
-      body
-        ? {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          }
-        : undefined,
-    );
+  const request = async (path: string, body?: unknown, retries = 0) => {
+    let response: Response;
+    try {
+      response = await fetch(
+        path,
+        body
+          ? {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            }
+          : undefined,
+      );
+    } catch (error) {
+      if (retries > 0) return request(path, body, retries - 1);
+      throw error;
+    }
     const payload = await response.json();
     if (!response.ok)
       throw new Error(payload.message ?? 'Room request failed.');
@@ -93,6 +112,23 @@ export function RoomMatch() {
     localStorage.setItem(tokenKey, nextToken);
   }
   useEffect(() => {
+    if (!code || !token || room) return;
+    let active = true;
+    request(`/api/rooms/${code}?token=${token}`)
+      .then((value) => {
+        if (active) setRoom(roomViewSchema.parse(value));
+      })
+      .catch(() => {
+        if (active)
+          setMessage(
+            'Could not restore your room. Try refreshing to reconnect.',
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, [code, token, room?.code]);
+  useEffect(() => {
     if (!room || !token) return;
     let active = true;
     const poll = async () => {
@@ -103,6 +139,7 @@ export function RoomMatch() {
             `/api/rooms/${room.code}/events?token=${token}&after=${revision}`,
           ),
         );
+        setConnection('connected');
         if (!active || sequence !== pollSequence.current) return;
         setRoom(events.room);
         setRevision(events.revision);
@@ -110,10 +147,13 @@ export function RoomMatch() {
           const next = roomGameViewSchema.parse(
             await request(`/api/rooms/${room.code}/game?token=${token}`),
           );
-          if (active) setGame(next);
+          if (active && sequence === pollSequence.current)
+            setGame((current) =>
+              current && current.revision > next.revision ? current : next,
+            );
         }
       } catch {
-        /* transient disconnects are retried on the next poll */
+        setConnection('reconnecting');
       }
     };
     void poll();
@@ -153,17 +193,24 @@ export function RoomMatch() {
             }),
           ),
         );
-      else if (game)
+      else if (game) {
+        const requestId = crypto.randomUUID();
         setGame(
           roomGameViewSchema.parse(
-            await request(`/api/rooms/${room.code}/game/commands`, {
-              action,
-              token,
-              revision: game.revision,
-              cardIds,
-            }),
+            await request(
+              `/api/rooms/${room.code}/game/commands`,
+              {
+                action,
+                requestId,
+                token,
+                revision: game.revision,
+                cardIds,
+              },
+              1,
+            ),
           ),
         );
+      }
       setSelected(new Set());
     } catch (error) {
       setMessage(
@@ -176,7 +223,7 @@ export function RoomMatch() {
   const selectedIds = useMemo(() => [...selected], [selected]);
   if (!room)
     return (
-      <section className="panel room-panel" id="play-room">
+      <section className="panel room-panel room-setup" id="play-room">
         <div className="section-heading">
           <div>
             <p className="eyebrow">PLAY TOGETHER</p>
@@ -238,12 +285,17 @@ export function RoomMatch() {
           <p className="muted">
             Seat {room.viewerSeat + 1} · Share the code with your table.
           </p>
+          <p className={`room-connection ${connection}`} role="status">
+            {connection === 'connected' ? 'Connected' : 'Reconnecting…'}
+          </p>
         </div>
         <button
           className="text-button"
           onClick={() => {
             localStorage.removeItem(codeKey);
             localStorage.removeItem(tokenKey);
+            setToken('');
+            setCode('');
             setRoom(null);
             setGame(null);
           }}
@@ -405,7 +457,7 @@ export function RoomMatch() {
               />
             </div>
           )}
-          {game.declarationOptions.length > 0 && (
+          {game.phase === 'declaration' && (
             <div className="room-options">
               <p className="eyebrow">AVAILABLE CALLS</p>
               {game.declarationOptions.map((option) => (
@@ -439,11 +491,13 @@ export function RoomMatch() {
                 <span>Kitty: {game.kittyCount} cards</span>
               </div>
               <div className="room-hand">
-                {game.hand.map((card) => (
+                {sortHand(game.hand).map((card) => (
                   <button
                     type="button"
                     className={`room-card ${selected.has(card.id) ? 'selected' : ''}`}
                     key={card.id}
+                    data-card-id={card.id}
+                    aria-pressed={selected.has(card.id)}
                     onClick={() =>
                       setSelected((current) => {
                         const next = new Set(current);
@@ -457,15 +511,16 @@ export function RoomMatch() {
                   </button>
                 ))}
               </div>
-              {game.phase === 'kitty' && game.viewerSeat === 0 && (
-                <button
-                  className="primary-button"
-                  disabled={busy || selected.size !== game.kittyCount}
-                  onClick={() => void command('bury', selectedIds)}
-                >
-                  Bury selected
-                </button>
-              )}
+              {game.phase === 'kitty' &&
+                game.viewerSeat === game.dealerSeat && (
+                  <button
+                    className="primary-button"
+                    disabled={busy || selected.size !== game.kittyCount}
+                    onClick={() => void command('bury', selectedIds)}
+                  >
+                    Bury selected
+                  </button>
+                )}
               {game.phase === 'tricks' && game.nextSeat === game.viewerSeat && (
                 <button
                   className="primary-button"

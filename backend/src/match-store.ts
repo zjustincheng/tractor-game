@@ -17,6 +17,30 @@ export interface SavedMatch {
   match: BotMatch;
   revision: number;
   touched: number;
+  events?: MatchEvent[];
+}
+export interface MatchEvent {
+  revision: number;
+  actor?: 'player' | 'bot' | 'system';
+  action: string;
+  seat?: number;
+  round?: number;
+  trick?: number;
+  team?: 'A' | 'B';
+  trump?: { level: string; suit: string | null };
+  ledCategory?: string;
+  hadLedCategory?: boolean;
+  usedTrump?: boolean;
+  jokerCount?: number;
+  points?: number;
+  winnerBefore?: number | null;
+  winnerAfter?: number | null;
+  winnerSeat?: number;
+  trickPoints?: number;
+  rating?: string;
+  cardIds?: string[];
+  detail?: string;
+  at: number;
 }
 const validId =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;

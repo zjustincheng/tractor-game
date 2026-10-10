@@ -30,7 +30,10 @@ export default defineConfig({
     },
     {
       command: `npm run dev -w frontend -- --port ${webPort}`,
-      env: { API_TARGET: `http://127.0.0.1:${apiPort}` },
+      env: {
+        API_TARGET: `http://127.0.0.1:${apiPort}`,
+        VITE_SHOW_TRAINING_TOOLS: 'true',
+      },
       url: `http://127.0.0.1:${webPort}`,
       reuseExistingServer: false,
       timeout: 30000,

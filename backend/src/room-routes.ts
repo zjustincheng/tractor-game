@@ -1,16 +1,4 @@
 import { randomInt, randomUUID } from 'node:crypto';
-import {
-  closeSync,
-  existsSync,
-  fsyncSync,
-  mkdirSync,
-  openSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import {
@@ -39,6 +27,7 @@ import {
 } from '@tractor/rules';
 import type { Card, MatchState, PLAYER_COUNTS } from '@tractor/rules';
 import { MemoryRoomRepository } from './room-repository.js';
+import { PostgresRoomStore } from './postgres-room-store.js';
 import type { RoomRepository } from './room-repository.js';
 
 interface RoomPlayer {
@@ -62,7 +51,7 @@ interface RoomEvent {
   displayName?: string;
   ready?: boolean;
 }
-interface Room {
+export interface Room {
   code: string;
   playerCount: (typeof PLAYER_COUNTS)[number];
   hostSeat: number;
@@ -77,15 +66,13 @@ interface Room {
   settlement: ReturnType<typeof settleRound> | null;
   dealingStartedAt: number;
   history: RoomTrick[];
+  processedCommands: Array<{ requestId: string; revision: number }>;
 }
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function code() {
   let value = '';
   for (let i = 0; i < 6; i++) value += alphabet[randomInt(alphabet.length)];
   return value;
-}
-function findRoom(rooms: RoomRepository<Room>, value: string) {
-  return rooms.get(value.toUpperCase());
 }
 function authorized(room: Room | undefined, token: string | undefined) {
   return room?.players.find((player) => player.token === token);
@@ -107,8 +94,9 @@ function project(room: Room, viewer: RoomPlayer) {
       ready,
     })),
     started:
-      room.players.length === room.playerCount &&
-      room.players.every((player) => player.ready),
+      !!room.match ||
+      (room.players.length === room.playerCount &&
+        room.players.every((player) => player.ready)),
   });
 }
 function gameProject(room: Room, viewer: RoomPlayer) {
@@ -123,7 +111,10 @@ function gameProject(room: Room, viewer: RoomPlayer) {
     dealerSeat: state.dealerSeat,
     levels: state.levels,
     phase: state.phase,
-    hand: state.hands[viewer.seat],
+    hand:
+      state.phase === 'kitty' && viewer.seat === state.dealerSeat
+        ? [...state.hands[viewer.seat]!, ...state.kitty]
+        : state.hands[viewer.seat],
     players: state.hands.map((hand, seat) => ({
       seat,
       displayName: room.players.find((player) => player.seat === seat)!
@@ -197,76 +188,30 @@ function gameProject(room: Room, viewer: RoomPlayer) {
 
 export function registerRoomRoutes(
   app: FastifyInstance,
-  options: { now?: () => number; saveDirectory?: string } = {},
+  options: {
+    now?: () => number;
+    saveDirectory?: string;
+    databaseUrl?: string;
+    roomRepository?: RoomRepository<Room>;
+  } = {},
 ) {
-  const rooms = new MemoryRoomRepository<Room>();
   const now = options.now ?? Date.now;
-  const directory = options.saveDirectory
-    ? join(options.saveDirectory, 'rooms')
-    : undefined;
-  let ownsLock = false;
-  if (directory) {
-    const lock = join(directory, '.owner.lock');
-    mkdirSync(directory, { recursive: true, mode: 0o700 });
-    try {
-      const descriptor = openSync(lock, 'wx', 0o600);
-      writeFileSync(descriptor, String(process.pid));
-      closeSync(descriptor);
-      ownsLock = true;
-      app.addHook('onClose', async () => {
-        if (ownsLock && existsSync(lock)) rmSync(lock);
-      });
-    } catch {
-      throw new Error(
-        'Another backend process already owns the room save directory.',
-      );
-    }
-  }
-  if (directory) {
-    mkdirSync(directory, { recursive: true, mode: 0o700 });
-    for (const file of readdirSync(directory)) {
-      if (!file.endsWith('.json')) continue;
-      try {
-        const room = JSON.parse(
-          readFileSync(join(directory, file), 'utf8'),
-        ) as Room;
-        if (
-          room.code &&
-          room.players?.length &&
-          room.createdAt > now() - 24 * 60 * 60 * 1000
-        ) {
-          room.dealingStartedAt ??= room.createdAt;
-          room.history ??= [];
-          rooms.set(room.code, room);
-        }
-      } catch {
-        /* ignore corrupt room snapshots; solo match saves remain recoverable */
-      }
-    }
-  }
-  const persist = (room: Room) => {
-    if (!directory) return;
-    const target = join(directory, `${room.code}.json`);
-    const temporary = `${target}.tmp`;
-    const descriptor = openSync(temporary, 'w', 0o600);
-    try {
-      writeFileSync(descriptor, JSON.stringify(room));
-      fsyncSync(descriptor);
-    } finally {
-      closeSync(descriptor);
-    }
-    renameSync(temporary, target);
-  };
-  const cleanup = () => {
-    for (const [key, room] of rooms)
-      if (room.createdAt < now() - 24 * 60 * 60 * 1000) {
-        rooms.delete(key);
-        if (directory) {
-          const file = join(directory, `${key}.json`);
-          if (existsSync(file)) rmSync(file);
-        }
-      }
-  };
+  const rooms: RoomRepository<Room> =
+    options.roomRepository ??
+    (options.databaseUrl
+      ? new PostgresRoomStore<Room>(options.databaseUrl, now)
+      : new MemoryRoomRepository<Room>(
+          now,
+          options.saveDirectory
+            ? join(options.saveDirectory, 'rooms')
+            : undefined,
+        ));
+  app.addHook('onReady', async () => {
+    await rooms.initialize();
+  });
+  app.addHook('onClose', async () => {
+    await rooms.close();
+  });
   app.post('/api/rooms', async (request, reply) => {
     const parsed = roomCreateSchema.safeParse(request.body);
     if (!parsed.success)
@@ -274,9 +219,7 @@ export function registerRoomRoutes(
         code: 'INVALID_ROOM',
         message: 'Choose a supported player count and display name.',
       });
-    cleanup();
     let roomCode = code();
-    while (rooms.has(roomCode)) roomCode = code();
     const player = {
       token: randomUUID(),
       seat: 0,
@@ -297,6 +240,7 @@ export function registerRoomRoutes(
       settlement: null,
       dealingStartedAt: now(),
       history: [],
+      processedCommands: [],
     };
     addEvent(room, {
       type: 'room-created',
@@ -304,56 +248,56 @@ export function registerRoomRoutes(
       displayName: player.displayName,
       ready: false,
     });
-    rooms.set(roomCode, room);
-    persist(room);
+    while (!(await rooms.create(room, room.events[0]))) {
+      roomCode = code();
+      room.code = roomCode;
+    }
     return { room: project(room, player), playerToken: player.token };
   });
   app.post<{ Params: { code: string } }>(
     '/api/rooms/:code/join',
-    async (request, reply) => {
-      cleanup();
-      const room = findRoom(rooms, request.params.code);
-      if (!room)
-        return reply.code(404).send({
-          code: 'ROOM_NOT_FOUND',
-          message: 'That room is no longer available.',
+    async (request, reply) =>
+      rooms.transact(request.params.code.toUpperCase(), (room, save) => {
+        if (!room)
+          return reply.code(404).send({
+            code: 'ROOM_NOT_FOUND',
+            message: 'That room is no longer available.',
+          });
+        if (room.players.length >= room.playerCount)
+          return reply
+            .code(409)
+            .send({ code: 'ROOM_FULL', message: 'That room is full.' });
+        const parsed = roomJoinSchema.safeParse(request.body);
+        if (!parsed.success)
+          return reply.code(400).send({
+            code: 'INVALID_PLAYER',
+            message: 'Choose a display name from 1 to 32 characters.',
+          });
+        const occupied = new Set(room.players.map((player) => player.seat));
+        let seat = 0;
+        while (occupied.has(seat)) seat++;
+        const player = {
+          token: randomUUID(),
+          seat,
+          displayName: parsed.data.displayName,
+          ready: false,
+        };
+        room.players.push(player);
+        addEvent(room, {
+          type: 'player-joined',
+          seat,
+          displayName: player.displayName,
+          ready: false,
         });
-      if (room.players.length >= room.playerCount)
-        return reply
-          .code(409)
-          .send({ code: 'ROOM_FULL', message: 'That room is full.' });
-      const parsed = roomJoinSchema.safeParse(request.body);
-      if (!parsed.success)
-        return reply.code(400).send({
-          code: 'INVALID_PLAYER',
-          message: 'Choose a display name from 1 to 32 characters.',
-        });
-      const occupied = new Set(room.players.map((player) => player.seat));
-      let seat = 0;
-      while (occupied.has(seat)) seat++;
-      const player = {
-        token: randomUUID(),
-        seat,
-        displayName: parsed.data.displayName,
-        ready: false,
-      };
-      room.players.push(player);
-      addEvent(room, {
-        type: 'player-joined',
-        seat,
-        displayName: player.displayName,
-        ready: false,
-      });
-      persist(room);
-      return { room: project(room, player), playerToken: player.token };
-    },
+        save(room, room.events.at(-1));
+        return { room: project(room, player), playerToken: player.token };
+      }),
   );
   app.get<{
     Params: { code: string };
     Querystring: { token?: string; after?: string };
   }>('/api/rooms/:code/events', async (request, reply) => {
-    cleanup();
-    const room = findRoom(rooms, request.params.code);
+    const room = await rooms.read(request.params.code.toUpperCase());
     const viewer = authorized(room, request.query.token);
     if (!room || !viewer)
       return reply.code(404).send({
@@ -376,8 +320,7 @@ export function registerRoomRoutes(
   app.get<{ Params: { code: string }; Querystring: { token?: string } }>(
     '/api/rooms/:code',
     async (request, reply) => {
-      cleanup();
-      const room = findRoom(rooms, request.params.code);
+      const room = await rooms.read(request.params.code.toUpperCase());
       const viewer = authorized(room, request.query.token);
       if (!room || !viewer)
         return reply.code(404).send({
@@ -389,56 +332,61 @@ export function registerRoomRoutes(
   );
   app.post<{ Params: { code: string } }>(
     '/api/rooms/:code/ready',
-    async (request, reply) => {
-      const room = findRoom(rooms, request.params.code);
-      const parsed = roomReadySchema.safeParse(request.body);
-      const player = authorized(
-        room,
-        parsed.success ? parsed.data.token : undefined,
-      );
-      if (!room || !player)
-        return reply.code(404).send({
-          code: 'ROOM_NOT_FOUND',
-          message: 'Room or player session not found.',
+    async (request, reply) =>
+      rooms.transact(request.params.code.toUpperCase(), (room, save) => {
+        const parsed = roomReadySchema.safeParse(request.body);
+        const player = authorized(
+          room,
+          parsed.success ? parsed.data.token : undefined,
+        );
+        if (!room || !player)
+          return reply.code(404).send({
+            code: 'ROOM_NOT_FOUND',
+            message: 'Room or player session not found.',
+          });
+        if (!parsed.success)
+          return reply.code(400).send({
+            code: 'INVALID_READY',
+            message: 'Provide a valid player token and ready state.',
+          });
+        if (room.match)
+          return reply.code(409).send({
+            code: 'GAME_STARTED',
+            message: 'The room game has already started.',
+          });
+        if (room.players.length === room.playerCount && !parsed.data.ready)
+          room.players.forEach((item) => {
+            item.ready = false;
+          });
+        player.ready = parsed.data.ready;
+        addEvent(room, {
+          type: 'player-ready',
+          seat: player.seat,
+          ready: player.ready,
         });
-      if (!parsed.success)
-        return reply.code(400).send({
-          code: 'INVALID_READY',
-          message: 'Provide a valid player token and ready state.',
-        });
-      if (room.players.length === room.playerCount && !parsed.data.ready)
-        room.players.forEach((item) => {
-          item.ready = false;
-        });
-      player.ready = parsed.data.ready;
-      addEvent(room, {
-        type: 'player-ready',
-        seat: player.seat,
-        ready: player.ready,
-      });
-      if (
-        room.players.length === room.playerCount &&
-        room.players.every((item) => item.ready) &&
-        !room.match
-      ) {
-        room.match = createRound({
-          playerCount: room.playerCount,
-          dealerSeat: 0,
-          attackingTeam: 'A',
-          shoe: shuffle(createDeck(room.playerCount), randomInt),
-          firstDeclarationDeadline: now() + 8000,
-        });
-        room.matchRevision = 1;
-      }
-      persist(room);
-      return project(room, player);
-    },
+        if (
+          room.players.length === room.playerCount &&
+          room.players.every((item) => item.ready) &&
+          !room.match
+        ) {
+          room.match = createRound({
+            playerCount: room.playerCount,
+            dealerSeat: 0,
+            attackingTeam: 'A',
+            shoe: shuffle(createDeck(room.playerCount), randomInt),
+            firstDeclarationDeadline: now() + 8000,
+          });
+          room.dealingStartedAt = now();
+          room.matchRevision = 1;
+        }
+        save(room, room.events.at(-1));
+        return project(room, player);
+      }),
   );
   app.get<{ Params: { code: string }; Querystring: { token?: string } }>(
     '/api/rooms/:code/game',
     async (request, reply) => {
-      cleanup();
-      const room = findRoom(rooms, request.params.code);
+      const room = await rooms.read(request.params.code.toUpperCase());
       const viewer = authorized(room, request.query.token);
       const game = room && viewer ? gameProject(room, viewer) : null;
       if (!game)
@@ -451,168 +399,209 @@ export function registerRoomRoutes(
   );
   app.post<{ Params: { code: string } }>(
     '/api/rooms/:code/game/commands',
-    async (request, reply) => {
-      const room = findRoom(rooms, request.params.code);
-      const parsed = roomGameCommandSchema.safeParse(request.body);
-      const viewer = authorized(
-        room,
-        parsed.success ? parsed.data.token : undefined,
-      );
-      if (!room || !viewer || !room.match)
-        return reply.code(404).send({
-          code: 'GAME_NOT_READY',
-          message: 'The room game is not ready.',
-        });
-      if (!parsed.success)
-        return reply.code(400).send({
-          code: 'INVALID_COMMAND',
-          message: 'Provide a valid game command.',
-        });
-      if (parsed.data.revision !== room.matchRevision)
-        return reply.code(409).send({
-          code: 'STALE_REVISION',
-          message: 'Refresh the room before trying again.',
-        });
-      let result: ReturnType<typeof receiveDeclaration>;
-      const state = room.match;
-      if (parsed.data.action === 'next-round') {
-        if (
-          viewer.seat !== room.hostSeat ||
-          !room.settlement ||
-          room.settlement.winner
-        )
-          return reply.code(422).send({
-            code: 'ROUND_NOT_READY',
-            message: 'The host can start another round after settlement.',
-          });
-        room.match = createRound({
-          playerCount: state.playerCount,
-          round: state.round + 1,
-          dealerSeat: nextDealer(
-            state.dealerSeat,
-            state.playerCount,
-            room.settlement.rolesSwapped,
-          ),
-          attackingTeam: room.settlement.attackingTeam,
-          levels: room.settlement.levels,
-          shoe: shuffle(createDeck(state.playerCount), randomInt),
-          firstDeclarationDeadline: now() + 8000,
-        });
-        room.trickPoints = 0;
-        room.penaltyPoints = 0;
-        room.settlement = null;
-        room.history = [];
-        room.matchRevision += 1;
-        persist(room);
-        return gameProject(room, viewer);
-      } else if (parsed.data.action === 'declare') {
-        const option = declarationsForHand(
-          state.hands[viewer.seat]!,
-          state.playerCount,
-          state.levels[state.attackingTeam],
-          viewer.seat,
-        ).find(
-          (item) =>
-            item.cardIds.slice().sort().join('|') ===
-            (parsed.data.cardIds ?? []).slice().sort().join('|'),
+    async (request, reply) =>
+      rooms.transact(request.params.code.toUpperCase(), (room, save) => {
+        const parsed = roomGameCommandSchema.safeParse(request.body);
+        const viewer = authorized(
+          room,
+          parsed.success ? parsed.data.token : undefined,
         );
-        result = receiveDeclaration(state, viewer.seat, option ?? null, now());
-      } else if (parsed.data.action === 'advance')
-        result = advanceDeclaration(state, now(), randomInt);
-      else if (parsed.data.action === 'bury')
-        result = exchangeKitty(state, parsed.data.cardIds ?? []);
-      else if (parsed.data.action === 'next-trick') {
-        if (!state.trick || state.trick.status !== 'complete')
-          return reply.code(422).send({
-            code: 'ROUND_NOT_READY',
-            message: 'Complete the current trick first.',
+        if (!room || !viewer || !room.match)
+          return reply.code(404).send({
+            code: 'GAME_NOT_READY',
+            message: 'The room game is not ready.',
           });
-        const handsEmpty = state.hands.every((hand) => hand.length === 0);
-        if (handsEmpty) {
-          const winning = state.trick.plays.find(
-            (play) => play.seat === state.trick!.winnerSeat,
-          )!;
-          const settlement = settleRound({
+        if (!parsed.success)
+          return reply.code(400).send({
+            code: 'INVALID_COMMAND',
+            message: 'Provide a valid game command.',
+          });
+        const requestId = parsed.data.requestId ?? randomUUID();
+        room.processedCommands ??= [];
+        if (room.processedCommands.some((item) => item.requestId === requestId))
+          return gameProject(room, viewer);
+        if (parsed.data.revision !== room.matchRevision)
+          return reply.code(409).send({
+            code: 'STALE_REVISION',
+            message: 'Refresh the room before trying again.',
+          });
+        let result: ReturnType<typeof receiveDeclaration>;
+        const state = room.match;
+        if (parsed.data.action === 'next-round') {
+          if (
+            viewer.seat !== room.hostSeat ||
+            !room.settlement ||
+            room.settlement.winner
+          )
+            return reply.code(422).send({
+              code: 'ROUND_NOT_READY',
+              message: 'The host can start another round after settlement.',
+            });
+          room.match = createRound({
             playerCount: state.playerCount,
-            attackingTeam: state.attackingTeam,
-            levels: state.levels,
-            trickPoints: room.trickPoints,
-            gamblePenaltyPoints: room.penaltyPoints,
-            finalTrickWinnerTeam: teamAt(state.trick.winnerSeat!),
-            finalWinningCards: winning.cards,
-            finalWinningStructure:
-              [...(winning.components ?? [])].sort(compareComponents)[0] ??
-              null,
-            kitty: state.kitty,
+            round: state.round + 1,
+            dealerSeat: nextDealer(
+              state.dealerSeat,
+              state.playerCount,
+              room.settlement.rolesSwapped,
+            ),
+            attackingTeam: room.settlement.attackingTeam,
+            levels: room.settlement.levels,
+            shoe: shuffle(createDeck(state.playerCount), randomInt),
+            firstDeclarationDeadline: now() + 8000,
           });
-          room.settlement = settlement;
-          result = {
-            ok: true,
-            state: {
-              ...state,
-              phase: 'finished',
-              defenderScore: settlement.defenderScore,
-            },
-          };
-        } else
-          result = {
-            ok: true,
-            state: { ...state, trick: nextTrick(state.trick) },
-          };
-      } else {
-        if (state.phase !== 'tricks' || !state.trick)
-          return reply.code(422).send({
-            code: 'ROUND_NOT_READY',
-            message: 'The trick is not ready.',
+          room.dealingStartedAt = now();
+          room.trickPoints = 0;
+          room.penaltyPoints = 0;
+          room.settlement = null;
+          room.history = [];
+          room.matchRevision += 1;
+          save(room, {
+            action: parsed.data.action,
+            seat: viewer.seat,
+            cardIds: parsed.data.cardIds,
+            matchRevision: room.matchRevision,
+            at: now(),
           });
-        const played = playCards(
-          state.trick,
-          viewer.seat,
-          parsed.data.cardIds ?? [],
-        );
-        result = played.ok
-          ? {
+          return gameProject(room, viewer);
+        } else if (parsed.data.action === 'declare') {
+          const option = declarationsForHand(
+            state.hands[viewer.seat]!,
+            state.playerCount,
+            state.levels[state.attackingTeam],
+            viewer.seat,
+          ).find(
+            (item) =>
+              item.cardIds.slice().sort().join('|') ===
+              (parsed.data.cardIds ?? []).slice().sort().join('|'),
+          );
+          result = receiveDeclaration(
+            state,
+            viewer.seat,
+            option ?? null,
+            now(),
+          );
+        } else if (parsed.data.action === 'advance')
+          result = advanceDeclaration(state, now(), randomInt);
+        else if (parsed.data.action === 'bury') {
+          if (viewer.seat !== state.dealerSeat)
+            return reply.code(403).send({
+              code: 'NOT_DEALER',
+              message: 'Only the dealer can exchange the kitty.',
+            });
+          result = exchangeKitty(state, parsed.data.cardIds ?? []);
+        } else if (parsed.data.action === 'next-trick') {
+          if (
+            state.phase !== 'tricks' ||
+            !state.trick ||
+            state.trick.status !== 'complete'
+          )
+            return reply.code(422).send({
+              code: 'ROUND_NOT_READY',
+              message: 'Complete the current trick first.',
+            });
+          const handsEmpty = state.hands.every((hand) => hand.length === 0);
+          if (handsEmpty) {
+            const winning = state.trick.plays.find(
+              (play) => play.seat === state.trick!.winnerSeat,
+            )!;
+            const settlement = settleRound({
+              playerCount: state.playerCount,
+              attackingTeam: state.attackingTeam,
+              levels: state.levels,
+              trickPoints: room.trickPoints,
+              gamblePenaltyPoints: room.penaltyPoints,
+              finalTrickWinnerTeam: teamAt(state.trick.winnerSeat!),
+              finalWinningCards: winning.cards,
+              finalWinningStructure:
+                [...(winning.components ?? [])].sort(compareComponents)[0] ??
+                null,
+              kitty: state.kitty,
+            });
+            room.settlement = settlement;
+            result = {
               ok: true,
               state: {
                 ...state,
-                phase: played.state.status === 'complete' ? 'tricks' : 'tricks',
-                defenderScore:
-                  played.state.status === 'complete'
-                    ? room.trickPoints +
-                      played.state.capturedDefenderPoints +
-                      room.penaltyPoints +
-                      played.state.penaltyPoints
-                    : state.defenderScore,
-                hands: played.state.hands,
-                trick: played.state,
+                phase: 'finished',
+                defenderScore: settlement.defenderScore,
               },
-            }
-          : { ok: false, code: 'INVALID_DECLARATION', message: played.message };
-        if (played.ok && played.state.status === 'complete') {
-          room.trickPoints += played.state.capturedDefenderPoints;
-          room.penaltyPoints += played.state.penaltyPoints;
-          room.history.push({
-            number: room.history.length + 1,
-            winnerSeat: played.state.winnerSeat!,
-            points: played.state.trickPoints,
-            defenderPoints: played.state.capturedDefenderPoints,
-            penalty: played.state.penaltyPoints,
-            plays: played.state.plays.map(({ seat, cards, matchesLead }) => ({
-              seat,
-              cards,
-              matchesLead,
-            })),
-          });
+            };
+          } else
+            result = {
+              ok: true,
+              state: { ...state, trick: nextTrick(state.trick) },
+            };
+        } else {
+          if (state.phase !== 'tricks' || !state.trick)
+            return reply.code(422).send({
+              code: 'ROUND_NOT_READY',
+              message: 'The trick is not ready.',
+            });
+          const played = playCards(
+            state.trick,
+            viewer.seat,
+            parsed.data.cardIds ?? [],
+          );
+          result = played.ok
+            ? {
+                ok: true,
+                state: {
+                  ...state,
+                  phase:
+                    played.state.status === 'complete' ? 'tricks' : 'tricks',
+                  defenderScore:
+                    played.state.status === 'complete'
+                      ? room.trickPoints +
+                        played.state.capturedDefenderPoints +
+                        room.penaltyPoints +
+                        played.state.penaltyPoints
+                      : state.defenderScore,
+                  hands: played.state.hands,
+                  trick: played.state,
+                },
+              }
+            : {
+                ok: false,
+                code: 'INVALID_DECLARATION',
+                message: played.message,
+              };
+          if (played.ok && played.state.status === 'complete') {
+            room.trickPoints += played.state.capturedDefenderPoints;
+            room.penaltyPoints += played.state.penaltyPoints;
+            room.history.push({
+              number: room.history.length + 1,
+              winnerSeat: played.state.winnerSeat!,
+              points: played.state.trickPoints,
+              defenderPoints: played.state.capturedDefenderPoints,
+              penalty: played.state.penaltyPoints,
+              plays: played.state.plays.map(({ seat, cards, matchesLead }) => ({
+                seat,
+                cards,
+                matchesLead,
+              })),
+            });
+          }
         }
-      }
-      if (!result.ok)
-        return reply
-          .code(422)
-          .send({ code: result.code, message: result.message });
-      room.match = result.state;
-      room.matchRevision += 1;
-      persist(room);
-      return gameProject(room, viewer);
-    },
+        if (!result.ok)
+          return reply
+            .code(422)
+            .send({ code: result.code, message: result.message });
+        room.match = result.state;
+        room.matchRevision += 1;
+        room.processedCommands.push({
+          requestId,
+          revision: room.matchRevision,
+        });
+        if (room.processedCommands.length > 200) room.processedCommands.shift();
+        save(room, {
+          action: parsed.data.action,
+          seat: viewer.seat,
+          cardIds: parsed.data.cardIds,
+          matchRevision: room.matchRevision,
+          at: now(),
+        });
+        return gameProject(room, viewer);
+      }),
   );
 }
