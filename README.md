@@ -295,3 +295,12 @@ therefore does not require switching the website to the new learner.
 For a faster human comparison, select **One-round quick match** when creating a bot game. It chooses a starting level randomly from 2 through A, uses the normal level declaration rules, and ends after that round settles.
 
 Policy selection uses level performance as the primary objective. Rollback requires at least 64 paired level samples whose 95% interval upper bound is below −0.5 levels; point-only regressions do not reset the learner. The existing four-generation cooldown remains. New `championLevelMarginSamples` are saved separately from legacy point samples and reset on promotion, rollback, feature migration, or human-learning updates. Old checkpoints start with no level rollback evidence. Round wins in evaluation output are descriptive counts within full matches, not an independent random-level quick-match benchmark. Choose unused screening and confirmation seeds before evaluating under the revised gate; historic reports are not fresh validation.
+
+## Roblox prototype
+
+A native Roblox starting point lives in [roblox/README.md](roblox/README.md).
+Run `node roblox/build.mjs`, then open `roblox/dist/Tractor.rbxlx` in Studio.
+It includes native Quick Match with multi-card rules, random starting levels,
+4/6/8/10-player bot tables, authoritative settlement, session coins, and reactions.
+See the [Quick Match review](docs/roblox-quick-match-review.md) for verification
+and the boundaries around advanced bots, persistence, and Studio testing.

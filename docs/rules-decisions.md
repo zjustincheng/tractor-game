@@ -135,6 +135,18 @@ Deck availability still applies: two decks contain only two big and two small jo
 
 In the first round, four small jokers require four big jokers to overturn; three big jokers are insufficient. This applies when the deck count supplies enough copies, including eight-player matches. “Locked” here concerns further overturning; declaration finalization still follows the applicable timer rules.
 
+### D13 — Roblox Joker-Pair No-Trump
+
+The Roblox version follows Tencent: two of the same joker can call no-trump during declaration. Roblox replaces D11's first-round limits with one overturn rule for declarations and Chao Di jokers, in every round: more cards win, and at the same size jokers beat a suit and big jokers beat small jokers. Players can call with every joker they hold. The website rules are unchanged.
+
+### D14 — Roblox Quads Beat Four-Card Tractors
+
+In Roblox, four of a kind can answer and beat a lead of one 4-card tractor (two consecutive pairs). Any quad beats a tractor of the same category, trump beats non-trump, and a tractor never beats a quad. Quads compare by strength against each other. This does not apply to longer tractors or to tractors inside a gamble. The website rules are unchanged.
+
+### D15 — Roblox Stakes Double on a Trump Change
+
+In Roblox, each overturn during declaration that changes the trump suit, or changes to or from no-trump, doubles the round's stake multiplier, the same as a successful Chao Di. The first declaration, a stronger reveal of the same suit, and small jokers to big jokers do not change it.
+
 ## Remaining Decisions
 
 The unresolved details above and the timing cases listed in [the roadmap](../ROADMAP.md) need concrete examples before dependent rules are implemented.

@@ -1,0 +1,11 @@
+{
+  "name": "Tractor",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": { "Tractor": { "$path": "src/shared" } },
+    "ServerScriptService": { "TractorServer": { "$path": "src/server" } },
+    "StarterPlayer": {
+      "StarterPlayerScripts": { "TractorClient": { "$path": "src/client" } }
+    }
+  }
+}

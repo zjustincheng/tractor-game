@@ -170,3 +170,485 @@ These tests do not contact a paid API, measure model quality, or establish stren
 # Level-based policy selection
 
 Policy evaluation tests cover promotion with a positive level interval and point uncertainty crossing zero, rejection beyond the −0.01 point tolerance, level-based rollback, separate point/level evidence, invalid evidence, legacy checkpoint loading, and descriptive round-win counts. Existing generation tests cover optimizer reset and cooldown, and the integration promotion test verifies the saved model matches the evaluated model. No long training or fresh-seed strength evaluation is part of these automated tests; random-level quick-match strength remains unmeasured.
+
+# Roblox foundation
+
+`roblox/tests/practice.lua` exercises the native pure Lua-compatible card and
+single-card practice modules: physical deck uniqueness, points, following,
+trump ordering, private projection, rejection without mutation, full-hand
+completion, and point conservation including the withheld kitty. Run with Lua
+5.3+ or Fengari. `node roblox/build.mjs` packages the source into a local Studio
+place without external assets or backend access.
+
+The initial Roblox port is an explicitly limited practice exercise, not full
+rule parity. Roblox Studio import, visual/touch layout, multiple clients,
+RemoteEvent security integration, and coin/emote interactions require the manual
+checklist in `roblox/README.md`; standalone tests do not establish those results.
+There is no persistent economy in this slice. Browser tests cover the original
+web app only and cannot validate a Roblox UI.
+
+Initial port verification (2026-10-30): the standalone practice suite passed
+under Fengari, and every platform script parsed. An exhaustive comparison with
+the TypeScript card module matched physical IDs and points for all 108 cards,
+and category/power for every card under all 65 level/suit combinations (including
+no-suit trump). The generated place XML parsed and embedded all five source
+scripts verbatim. Studio play, screenshots, touch layout, and multi-client
+verification have not been performed.
+
+Roblox setup continuation: `roblox/tests/setup.lua` covers server-time declaration
+expiry, eight-second resets, random fallback with a second window, first-round
+mixed-joker lock, kitty dealer selection, rejection of malformed/duplicate/unowned
+burials without mutation, and card conservation across a bot dealer's exchange
+and opening plays. The complete-hand test now starts with declaration and burial.
+Both suites pass under Fengari, and the server/client scripts parse. The UI adds
+declaration options, a countdown, and eight-card selection; Studio visual and
+multi-client checks remain unperformed and are listed in `roblox/README.md`.
+
+`roblox/tests/server.lua` runs the real server handler with service doubles and
+passes two complete practice hands through declarations and burial. It verifies
+stale revision rejection, no repeat reward after replayed completion commands,
+insufficient funds, duplicate purchases, emote ownership and cooldown, private
+projections, and reset on reconnect. This does not validate actual Roblox network
+transport, scheduler behavior, rendering, or persistent storage.
+
+# Roblox full-screen table UI
+
+`roblox/tests/client.lua` executes the real LocalScript using UI/service doubles.
+It verifies a full-screen backdrop, safe-area controls, declaration commands,
+33-card burial selection and its eight-card limit, selection before explicit play,
+shop commands, mute behavior, and rerendering on viewport changes.
+`roblox/tests/layout.lua` checks card bounds, raised selections, action clearance,
+and portrait row fitting at 1440×900, 1280×720, 1024×768, 390×844, 375×667,
+and 844×390, with 0, 1, 25, and 33 cards.
+
+`roblox/tests/preview.mjs` captures the actual LocalScript's instance tree from
+the doubles and renders browser approximations for visual inspection. These are
+saved in ignored `roblox/dist/previews/`; they do not establish Studio visual
+parity, font support, safe-area correctness, or live touch/Roblox input behavior.
+The actual Studio device and multiplayer checklist remains outstanding.
+
+# Roblox Quick Match rules review
+
+The current Roblox rules replace the initial single-card prototype described
+above. `npm run test:roblox -- /path/to/lua-or-fengari` runs the native suites and
+cross-language fixtures generated directly from the website's TypeScript rules.
+The parity run covers 16 declaration sets, 149 decompositions, 244 follow cases,
+explicit gamble/winner cases, 44 scoring boundaries, and 12 full rounds with
+1,512 per-command comparisons across 4/6/8/10 players. Final kitty settlement uses
+the largest winning component, as in `backend/src/bot-match.ts`, rather than
+requiring the entire final gamble to be homogeneous. Quick Match winner selection
+is tested separately from full-match advancement.
+
+`moves.lua` adds server transition checks for pair submission, wrong-count and
+set-avoidance rejection without mutation, failed gamble returns and both penalty
+signs, any-component trump overtakes, final-gamble kitty multiplier, dealt-card
+eligibility, and first-round joker takeover. The client suite selects and submits
+a pair through the real UI callback, then verifies both cards are rendered. The
+server suite completes Quick Matches with random starting levels, ensures rewards
+cannot repeat, and prevents continuing a Quick Match as a multi-round game.
+
+The existing trained bot-policy tests do not establish strength parity for the
+native baseline bots. Browser approximations and service doubles do not verify
+Roblox Studio rendering, live networking/scheduling, or device input. See
+`docs/roblox-quick-match-review.md` for the feature comparison and `roblox/README.md`
+for the outstanding Studio checklist. Native tests require a supplied Lua/Fengari
+runtime and are separate from the default TypeScript CI checks.
+
+The mode-selection header now uses a `GAME MODES` title instead of a player
+profile. `preview.mjs` includes a home-screen capture and checks that the header
+has no player name. Verification on 2026-11-02: formatting and standalone place
+build succeeded. Native tests stopped at `practice.lua:35` (round did not finish);
+UI preview stopped at the existing hero shimmer because the UI double supplies
+no default `ZIndex`. No new home screenshot was generated; Studio visual
+verification remains outstanding.
+
+Follow-up Studio verification on 2026-11-02: the connected `Tractor.rbxlx`
+contained an older `RobloxMascot` block in `buildIllustratedThumbnail`.
+Removed that block from the edit-time `StarterPlayerScripts.Main` using
+`ScriptEditorService:UpdateSourceAsync`, then restarted Play. Client inspection
+confirmed all four visible mode thumbnails have zero image labels, and a native
+Studio screen capture confirmed all four portrait badges are gone. This verifies
+the mode-card removal only; the earlier native-suite failures remain unresolved.
+
+# Roblox lobby clarity pass
+
+On 2026-11-02, updated both the local client source and the connected Studio
+place: the four mode cards select 4/8/10/6 players, display team sizes instead of
+hard-coded online counts, and show short mode descriptions when space permits.
+The unsupported Seven Stars label now identifies the existing ten-player mode.
+The featured panel explains Classic instead of advertising a static event timer;
+the redundant sidebar is hidden so mode cards have more room.
+
+Native Studio Play verification used actual mouse clicks on all four mode-card
+buttons and checked the resulting tier titles for 4/8/10/6 players. The featured
+Classic button also selected four players. A fresh Play session confirmed visible
+descriptions and no mascot images on any card; a native screenshot was inspected
+at 1920×1080. Formatting and standalone place build passed. Phone layout and full
+round completion were not verified by this lobby pass.
+
+# Roblox queued player-count regression
+
+On 2026-11-02, reproduced a ten-player lobby selection starting a four-player
+match in native Studio. The server now retains and validates the selected count
+through queue creation, automatic starts, Start Now, and Change Table. The queue
+screen shows the selected team/deck sizes and explicitly identifies bot seats.
+
+`roblox/tests/queue-studio.luau` is a Client-datamodel integration check for a
+fresh Studio Play session with the default novice-eligible balance. It invokes
+the real remote and server scheduler. It passed for 4/6/8/10 players, covering
+automatic start, Change Table, Start Now, invalid queue/start rejection, and
+cancellation beyond the original deadline. It is separate from the CLI suites.
+Native mouse clicks also verified the ten-player card → novice join → ten-player
+match flow, including automatic dismissal of the queue overlay. A native queue
+screenshot confirmed the selected five-versus-five/five-deck/nine-bot summary.
+This pass does not establish full-round rule correctness or mobile layout parity.
+
+On 2026-11-03, custom-table bottom challenges were expanded beyond pairs. The
+server now exposes stronger triples (and larger same-rank groups where the deck
+supports them) to overturn a pair, including joker groups. The live Studio rule
+module was exercised with a two-card bottom declaration and a three-card level
+group; it returned a valid triple challenge. Formatting, place generation, and
+diff checks passed.
+
+The client now renders every valid bottom challenge as a selectable control,
+highlights the chosen pair/triple/joker group, and submits that option's index.
+The previous default-first-option behavior is gone. A fresh Studio Play session
+started successfully with the chooser code; the full hand path still needs a
+manual Studio run that reaches a player-controlled Chao Di decision.
+
+An additional live Play run reached a player-controlled Chao Di phase with zero
+legal options, correctly showing no challenge buttons and leaving PASS available.
+The server-side triple-option case remains covered by the direct live module
+check; a naturally dealt player triple still needs a favorable hand to exercise
+the visible chooser end to end.
+
+On 2026-11-03, custom-table bot bankrolls and settlement caps were corrected.
+The server now creates a bankroll for every bot seat and includes every opposing
+seat when calculating the carried-coin cap and distributing match results. A live
+10-player Studio match was inspected and contained bankrolls for all seats 2–10.
+Formatting, place generation, and diff checks passed.
+
+The match HUD was also cleaned up on 2026-11-03: the unified trump/defender
+points box now occupies the old `TRACTOR` header-title position during a match,
+while the title remains visible in the lobby. A native 1920×1080 Studio capture
+confirmed `TRUMP`, defender points, score progress, and status are grouped in the
+header. After Chao Di, the player remains in an editable kitty phase; the hint
+now explicitly says the new bottom can be replaced before confirming.
+
+On 2026-11-03, custom-table presentation was corrected: Novice, Pro, and Master
+descriptions now say Quick Match without claiming every table is 2v2. The score
+meter's small-shutout cutoff now scales with the selected player count instead of
+remaining fixed at 40 points. Live Studio checks confirmed the custom descriptions
+and room-stake settlement are active; formatting, place generation, and diff
+checks passed.
+
+# Roblox Tencent-style earnings and point animation
+
+On 2026-11-03, match settlement earnings were changed to follow a Tencent-style
+欢乐升级 room model: the selected room supplies the base stake (Novice 500, Pro
+1.5K, Master 5K), then the hand result multiplies it through grade, 抠底, and
+炒底 bonuses. Wallet balance controls room eligibility and remains a carried
+balance cap; it does not add an arbitrary percentage to a room payout. Winners
+pay the room ante as a fee and losers pay the result plus that room fee.
+
+The floating `+PTS!` point-capture animation was removed from the client. Point
+capture, vault credit, and quest progress remain server-authoritative. Native
+Studio checks confirmed the live server contains `walletMultiplier` and the live
+client creates no `ScoreCapturePill`. Formatting, place generation, and diff
+checks passed.
+
+The match HUD declaration pass now uses a transparent placard group with only
+the trump and defender-point pills filled, avoiding the pasted outer rectangle.
+Declaration controls are rendered as a Tencent-style NT/spades/hearts/clubs/
+diamonds strip; each suit lights only when a legal next declaration exists, and
+pressing the same suit again advances to its next legal count. The active
+declarer also receives small declared-card tiles above their profile. After a
+Chao Di, the action button explicitly changes to `REPLACE BOTTOM` while keeping
+the kitty cards selectable. The rebuilt LocalScript was injected into the open
+Studio place and ran without new console errors; a full naturally-dealt
+declaration visual still needs a favorable hand to exercise every lit suit.
+
+The declaration strip was subsequently split into two rows: Small Joker and Big
+Joker controls above the four suit controls. Joker labels now map to their
+specific server-side declaration kind instead of using a generic NT button.
+
+# Roblox native suites restored, Chao Di and trick clarity
+
+On 2026-11-06 the native suites that had stopped at `practice.lua:35`,
+`setup.lua:35`, `server.lua:44`, and the client load were brought up to date with
+the Chao Di phase and the coin economy. All suites pass under Fengari 0.1.5:
+headroom probe, practice, setup, moves, chaodi, server, layout, client, and the
+website parity run.
+
+- `chaodi.lua` (new): three of a kind overturns either joker pair; a level pair
+  still cannot, a joker pair cannot overturn a triple, and big jokers still beat
+  small jokers. A successful Chao Di changes trump and who re-buries
+  (`kittyHolder`) but keeps the dealer, scheduled dealer, and attacking team; the
+  original dealer can still challenge back and leads the first trick.
+- `practice.lua`/`setup.lua` complete the Chao Di round (human passes, bots
+  decide) before trick play.
+- `server.lua` now covers the 3,000-coin starting balance, priced unlocks,
+  ownership-gated emote broadcasts (a fix: unowned reactions previously
+  broadcast), emote cooldown, Chao Di passes through the real handler, settlement
+  payout equal to `netCoins + reliefCoins`, replay safety, and session reset.
+- `client.lua` service doubles gained the Roblox APIs the client now uses (sound
+  playback, tweens that apply end values, input events, `task.defer`). New checks:
+  Chao Di pass via Clear, owner tags on every play with the winner marked,
+  the last-trick peek and return, and the exact points pop-up text.
+- `run.mjs` first compiles the client with 12 extra top-level locals appended.
+  Lua and Luau cap a function at 200 locals; the client had reached that limit,
+  which would have stopped the LocalScript compiling in Studio.
+
+`preview.mjs` play/multi modes now render a trick in progress (one completed
+trick plus a partial one), and hide fully transparent text. These remain browser
+approximations; Studio rendering, fonts, tween timing, and device input were not
+verified in this pass.
+
+# Roblox full matches and saved progress
+
+On 2026-11-06 added Full Match (rounds to Ace) alongside Quick Match, and
+DataStore-backed progress. All native suites pass under Fengari 0.1.5.
+
+- `server.lua`: a full match starts at level 2 and is not decided by one round;
+  Play Again and Next Round both continue at the same table, keeping its stake
+  tier and bot balances and the settled levels; Change Table keeps the match
+  length. Payouts include the full-match bonus field.
+- `server.lua` persistence, through an in-memory DataStore double: coins and
+  unlocks survive rejoin; the daily reward is once per calendar day across rejoin
+  (previously rejoining reset it); corrupt saves are sanitized (negative/NaN
+  numbers, unknown ids, coin products, unowned equipped items) while starter-owned
+  items stay equippable; a failed load warns the player and never writes, leaving
+  the saved data intact; unchanged sessions skip the write.
+- `client.lua`: the match-length toggle and its `fullMatch` queue flag; an
+  undecided full-match round shows `▶ NEXT ROUND (2)`.
+- `preview.mjs` adds table-screen captures (`tier`, `tier-phone`).
+
+Not verified: real DataStore behaviour, throttling and retries in Studio or live
+servers (requires a published place with API access), autosave timing, shutdown
+saves, the leave-during-load path, and multi-server concurrency (saves are
+last-writer-wins without a session lock). The table-selection screen has a
+600px minimum width and overflows portrait phones; this predates the toggle.
+
+# Roblox trick coins and Chao Di stakes
+
+On 2026-11-06: captured points now pay coins per trick (10/30/100 per point by
+table) times the Chao Di stake, including the final trick, which previously paid
+nothing. The round multiplier cap rose from ×64 to ×256. `server.lua` checks that
+trick coins equal the history's team points × table rate × stake, that a ×4 stake
+pays four times as much, and that the wallet equals the start balance plus trick
+coins plus settlement. `client.lua` checks the stake pill and the "CHAO DI! STAKES
+×N" banner when the stake rises. Studio feel of the payout sizes is not verified.
+
+Save-status follow-up (2026-11-06): the server reports `saving = {enabled, reason}`
+to the client; unpublished places (`PlaceId == 0`) skip the DataStore with a
+publish/API-access explanation, and Studio API-access errors map to the exact
+setting. `server.lua` covers enabled status, outage and API-access reasons, and
+the warning log; `client.lua` covers the once-per-session popup and the balance
+status text. Shutdown now waits for in-flight leave saves; this wait is not
+exercised by the doubles.
+
+Payout follow-up (2026-11-06): captured-point coins are no longer credited per
+trick; they are tallied and paid with the settlement at the final Chao Di stake.
+`Scoring.payoutGrade` (shared, outside the website-parity rules) grades defenders
+one step per interval past the overturn line without the previous ×4 ceiling.
+`server.lua` asserts the wallet does not change during trick play, the settlement
+total, and grades 80/119/120/160/200/240/280 → 1,1,2,3,4,5,6 (and six-player
+steps); `client.lua` asserts the meter text `OVERTURN ×3 · NEXT AT 200` at 165.
+
+# Roblox reactions overhaul
+
+On 2026-11-06 reactions moved to one definition table (`arenaUI.emoteDefs`) used by
+the dock, shop and animations, and quick-chat lines to `Catalog.phrases` shared
+with the server. Fixed: the Laugh reaction referenced a missing colour and errored;
+own reactions played twice (local + server echo); a fake "+1" coin toast on every
+send; 6–10 player bots threw from the local player's seat and targets listed fixed
+names; purchased reactions were unusable from the dock; "Wait for my play!" and
+"Good luck!" were dropped by the server; any owned item (e.g. felts) could be
+broadcast as an emote.
+
+`client.lua` (with queued `task.delay` callbacks it can flush, a controllable
+clock and stubbed `math.random`) covers: locked reaction price prompt, immediate
+throw and bubble, cooldown, a bot reply, skipping our own server echo, playing
+another sender's reaction from their seat, team targets at ten players, and
+Opponents hitting all five. `server.lua` covers broadcast fields, phrase
+acceptance, and non-emote rejection. `preview.mjs` adds `chat` and `chat-phone`.
+Not verified in Studio: sheet art, sounds, tween feel, and bubble placement at
+every seat.
+
+Reaction redesign (2026-11-06): visuals moved to `src/client/Reactions.luau`
+(packaged beside the LocalScript, matching the Rojo layout). `client.lua` throws
+all nine reactions through the real sheet and asserts each launches, every effect
+instance (trail, rings, pops, petals, stains, droplets, smoke, flash, confetti,
+steam, speed lines, dust, hit glow) is cleaned up, and the hit wobble settles at
+0°; this caught zero-size emoji particles. Preview screenshots cover the sheet on
+desktop and phone. Motion timing, arc shape, emoji rendering and sounds have not
+been seen in Studio; the previews show static end states only.
+
+# Roblox lobby phones, crowded seats, bot Chao Di, stats
+
+On 2026-11-06:
+
+- Lobby (home and table selection) uses a stacked layout below 600px wide;
+  previews `home-phone`, `tier-phone`, `tier-landscape` confirm no overflow.
+- Ten-player seats switch from an ellipse to a superellipse when side seats would
+  overlap; preview `ten-player-short` (1280×620) shows no overlapping panels.
+- Bots Chao Di only for ≥3 more trumps (≥5 for the kitty holder's team) and at
+  least a quarter of the hand in trump. `chaodi.lua` covers strong, weak, and
+  teammate hands and a passing bot.
+- Lifetime stats are tracked at settlement and saved/sanitized with progress;
+  `server.lua` checks round counting, survival across rejoin, and cleaning of
+  corrupt stats. `client.lua` checks the STATS panel values; preview
+  `stats-phone`. `preview.mjs` now honours AnchorPoint and UISizeConstraint.
+
+# Roblox shared multiplayer tables
+
+On 2026-11-06 the server moved from one bot game per player to shared tables.
+
+- `multiplayer.lua` (rules engine): several human seats at 4/6/10 players play a
+  full round with bots skipping human seats, `autoAct` for idle humans, points
+  conserved; `relativeView` rotates seats for every viewer, swaps team labels,
+  levels and points for team-B viewers, and leaves the real state untouched.
+- `tables.lua` (real server handler, four simulated players): private table
+  creation and join by code (case-insensitive, unknown codes refused), friends
+  seated as teammates, host-only start, private hands, rotated views, reactions
+  routed between seats and isolated per table, a full shared round settled once
+  per player with matching results, idle timeout auto-play with a table message,
+  leaving (bot takes the seat, host passes on), quick join pairing strangers with
+  equal settings, and disconnects.
+- `server.lua` keeps the solo flow; stale-command coverage moved to declarations,
+  since plays are validated directly and no longer require the latest revision.
+- `client.lua` covers the waiting room (host vs guest), real seat names, a friend's
+  reaction from their seat, and Create private / Join by code; previews `waiting`,
+  `waiting-phone`, `tier`, `tier-phone`.
+  Not verified: real Roblox networking with several clients (use Studio's
+  Clients and Servers test), turn-timer countdown rendering, and cross-server play.
+
+# Roblox squads and cross-server matchmaking
+
+On 2026-11-06:
+
+- `matchmaker.lua` (pure): squads stay on one team, squads larger than a team are
+  rejected, fill on/off (no strangers join a no-fill squad's team), waiting then
+  launching with bots after 20 s, modes never mix, oldest ticket first.
+- `tables.lua`: same-server squads — invite/accept, leader-only queue, squad and
+  two solos dealt at once with the squad as teammates, size limit, kick (search
+  cancelled), fill toggle, disconnect dissolving a squad, solo wait then bots,
+  separate modes.
+- `crossserver.lua` (MemoryStore/Messaging/Teleport doubles): squad becomes one
+  shared ticket, a full match reserves one server, records seats (squad on one
+  team), teleports all four with the access code and match id, removes tickets;
+  another server's live lock blocks matching and an expired lock is taken over;
+  invites arrive from another server and accepting teleports to that server with
+  joinSquad; inviting an absent friend publishes a cross-server invite.
+- `matchserver.lua`: a reserved server seats arrivals from the shared record,
+  sends unlisted players back to the lobby, deals when all arrive or after 15 s,
+  and Lobby teleports to a public server.
+- `client.lua`: squad panel (crown, kick, fill, leave, leader-only Play), invite
+  list and send, invite pop-up accept, search bar text and cancel; previews
+  `squad`, `squad-phone`. `PREVIEW_ONLY=name,…` renders a subset.
+  Not verified: real MemoryStore/MessagingService/TeleportService behaviour,
+  limits and failures, teleport latency, GetFriendsOnline/PromptGameInvite, and
+  reserved-server lifecycle — these need the published game with two accounts.
+
+# Roblox visual polish pass
+
+On 2026-11-06, from a full preview audit (21 captures):
+
+- Buttons: one flat style (soft corners, hairline border, gold gradient for
+  primaries) replacing stacked shine/bevel strips; disabled primaries turn grey
+  with muted text.
+- In-game header: controls flow right-to-left with fixed gaps (previously CHAT,
+  LOBBY and the settings button overlapped and the rewards text was cut off);
+  phones use two rows with the trump/points panel centred underneath; the
+  reactions/shop button joined the flow.
+- Removed: an always-visible empty status box, declaration tiles lingering into
+  trick play, a hero-button shimmer drawn outside the button (grey box), a new
+  banner gradient created on every render, and a duplicate Next Round button
+  under the result screen; Change Table no longer double-queues.
+- Lobby: its own backdrop instead of the game table, VIP/PASS prototype badges
+  hidden, bottom bar spread evenly, squad card with invite slots.
+- Result screen: dimmed background, clear headline, sized to content, payout on
+  readable lines.
+- `preview.mjs` now honours UIPadding, ClipsDescendants, text transparency and
+  disabled gradients, raises its output buffer (10-player captures failed), and
+  adds `settle`/`settle-phone`.
+  Not verified in Studio: font rendering of the new button faces, emoji in
+  labels, and touch feel.
+
+Visual polish, second pass (2026-11-06): felt lighting (layered centre ellipses
+plus crossing edge-shade gradients, pill-shaped), card faces (mirrored corner
+index, centred pip, unframed crown/joker art; cards under 72px keep the simple
+face), classic card back (inset frame, lattice, medallion), seat panels
+(gradient, team accent, drop shadow, hand-count badge with a drawn mini card),
+and a dealing swing-in (rotation + pop from the hand's centre). `preview.mjs`
+renders gradient transparency and scale corner radii; the client harness keeps
+NumberSequence keypoints. Motion (deal swing) is not visible in static previews.
+
+Squads public/private and save visibility (2026-11-06): Fill was replaced by a
+squad privacy toggle (`squad_privacy`); public squads (and public solo players)
+are listed in `openSquads` and can be joined with `squad_join`; matchmaking always
+fills open seats. `tables.lua` covers listing, joining a public squad without an
+invite, private squads being unlisted and refusing joins. The lobby header shows
+save status (✓ Saved / ⚠ Not saving; tap to reopen the explanation) because the
+in-game status line is hidden behind the lobby backdrop. Leaving the game now
+always saves even if table/squad cleanup fails (pcall-guarded).
+
+Reactions v3 (2026-11-06): launch burst at the sender; flight with arc scaling,
+a ground shadow and sparkle trail; comic impact words; richer landing effects;
+target marks (splat + drips, soot + smoke, rising hearts, glow/sparkles, steam,
+tyre tracks); bomb table shake; glossy tiles with gold frames for paid
+reactions; impacts land just inside the target seat. `client.lua` asserts every
+new effect instance is cleaned up. `preview.mjs` adds freeze-frame captures
+(`flight`, `impact-*`) where tweens stop at 55% and the flight is sampled at
+mid-arc, and now renders Rotation, UIScale and text strokes.
+
+Lobby private tables (2026-11-06): CREATE PRIVATE, the code box and JOIN moved
+from the stake screen to the lobby bottom bar (desktop: right of the nav
+buttons; phones: their own row). CREATE PRIVATE opens a 4/6/8/10-player size
+picker. `client.lua` checks the picker and that the controls live in the lobby
+bar; `preview.mjs` adds `private-picker` and `private-picker-phone`. Stake
+cards no longer show the info rows.
+
+Wallet-capped winnings (2026-11-06): a round's result pays at most the coins
+you carried into it (and no more than the losing side holds); losses were
+already capped by your balance. Settlement sends `cappedByWallet` and the
+modal reads "capped at your 3K". `server.lua` plays a ×128-stake round
+against rich bots with a 50K wallet and asserts the win pays exactly 50K.
+
+Roblox trained bots (2026-11-09): `roblox/src/server/TrainedBots.luau` ports the
+website's learned-policy inference and its heuristic baseline;
+`ChampionModel.luau` holds the weights from `run-wtIbnC` (exported by
+`roblox/export-champion.mjs`). Bots at 4-player tables use it for leads, follows,
+declarations and burial; Chao Di, 6/8/10-player tables, idle-player autoplay and
+hints keep the existing Roblox heuristics. `parity.mjs` compares inputs, baseline
+flags and choices against the TypeScript (random models always; the real champion
+when `data/` is present, 508 choices). `trained.lua` covers table-size gating,
+public-only context, and fallback on a crash or illegal choice.
+`tests/headtohead.lua` (manual) measured trained vs Roblox heuristics over paired
+deals with swapped teams: 4p 200 deals 52.0% of rounds, level margin +0.003 (95%
+CI -0.054 to +0.059); no measurable advantage. 6p/8p/10p samples (25-40 deals)
+were also indistinguishable. Rounds ran under Fengari, not Studio.
+
+Play-style guards and Roblox-targeted training (2026-11-09): `play-style.ts`
+encodes reviewed champion mistakes (side pair led before a safe ace of that suit, lone high
+trump with no plan, early big-joker lead, big joker spent unnecessarily, barely
+winning a contested trick). Models with 33 inputs (`contextual-leads-v12-play-style`)
+replace those moves and receive a teacher signal; v10/v11 champions keep their
+original inference through `load-policy.ts`. `style-audit-cli.ts` counts each
+flaw and `style-compare-cli.ts` measures the guards on v11 weights. `roblox-bot.ts`
+is the Roblox heuristic as a practice opponent and promotion gate; `parity.mjs`
+checks it, the v12 inputs and the guards against the Luau. Trick play is shared
+with the website, but Chao Di is not simulated during training. Training covers
+4-player tables only.
+
+## Roblox profile page
+
+`roblox/tests/profile.lua` covers the cosmetic catalog, saving and rejecting forged items, equipping, coin purchases, and stat or VIP unlocks. The profile UI and server message path were checked in a Roblox Studio playtest. Frames shown to other human players at a table need a multiplayer test.
+
+## Roblox VIP table markers
+
+`roblox/tests/tracker.lua` covers suit voids inferred from public plays, the rule that the tracker reads only public fields, and that every part marked safe passes the real gamble check against hidden hands across random deals.
+
+## Roblox Battle Pass
+
+`roblox/tests/pass.lua` covers the reward catalog, XP limits, timed card-marker boosts, claim rules, premium locks, saving, forged data, and season resets. Paying out a real premium purchase needs a live test once a Developer Product ID is set.

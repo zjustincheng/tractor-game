@@ -30,7 +30,10 @@
     "validate:backup": "sh scripts/validate-backup.sh",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build"
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build",
+    "test:roblox": "node --import tsx roblox/tests/run.mjs",
+    "roblox:serve": "rojo serve roblox/default.project.json",
+    "roblox:build": "node roblox/build.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
