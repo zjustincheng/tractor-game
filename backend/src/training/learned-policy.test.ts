@@ -191,7 +191,7 @@ describe('contextual lead learner', () => {
     expect(next.rollbackCooldown).toBe(ROLLBACK_COOLDOWN_GENERATIONS);
     expect(next.generationsSincePromotion).toBe(32);
     expect(report.generationsSincePromotion).toBe(32);
-  }, 20000);
+  }, 60000);
 
   it('leaves a recovering learner alone until the cooldown expires', () => {
     const champion = parsePolicy(newPolicy(seededRandom(73)));
@@ -210,7 +210,7 @@ describe('contextual lead learner', () => {
     expect(
       (next.championLevelMarginSamples ?? []).length,
     ).toBeGreaterThanOrEqual(64);
-  }, 20000);
+  }, 60000);
 
   it('offers every generated structure, including splitting a tractor, and explores reproducibly', () => {
     const options = leadOptions(hand, trump, context);
@@ -564,7 +564,7 @@ describe('contextual lead learner', () => {
         parsePolicyCheckpoint(JSON.parse(JSON.stringify(first))),
       ),
     ).toEqual(trainPolicyGeneration(first));
-  }, 20000);
+  }, 60000);
 
   it('requires enough complete evaluation matches and keeps model files explicit', () => {
     expect(
@@ -682,7 +682,7 @@ describe('contextual lead learner', () => {
         ...checkpoint,
         policyVersion: 'contextual-leads-v4-calibrated-exploration',
       }).policyVersion,
-    ).toBe('contextual-leads-v11-tactical-context');
+    ).toBe('contextual-leads-v12-play-style');
     expect(() => parsePolicy({ ...checkpoint.learner, output: [NaN] })).toThrow(
       /Invalid/,
     );

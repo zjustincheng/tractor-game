@@ -20,14 +20,26 @@ import type {
   Declaration,
   Trump,
 } from '@tractor/rules';
+import {
+  CONTESTED_TRICK_POINTS,
+  followGuard,
+  isHighTrumpSingle,
+  isSidePairWithoutAce,
+  isSideAce,
+  isSmallProbe,
+  leadGuard,
+  summarizeFollows,
+} from './play-style.js';
 
 export type LeadPolicy = (
   hand: readonly Card[],
   trump: Trump,
   context: BotLeadContext,
 ) => string[];
-export const POLICY_VERSION = 'contextual-leads-v11-tactical-context';
-export const INPUTS = 30;
+export const POLICY_VERSION = 'contextual-leads-v12-play-style';
+export const INPUTS = 33;
+/** Models with fewer inputs are earlier champions; they keep their old play. */
+const STYLE_INPUTS = 33;
 export const HIDDEN = 16;
 /**
  * L2 norm of one generation's parameter update. Constant, so the policy keeps
@@ -50,6 +62,8 @@ export const BASELINE_PRIOR = 0.35;
  * replacing it. Greedy evaluation is unaffected: argmax ignores temperature.
  */
 export const EXPLORATION_TEMPERATURE = 0.15;
+/** Same strength as the ace guard: a nudge beside the outcome signal. */
+const STYLE_TEACHER_WEIGHT = 0.05;
 export interface PolicyModel {
   input: number[][];
   bias: number[];
@@ -110,7 +124,7 @@ export function parsePolicy(value: unknown): PolicyModel {
     !model ||
     !Array.isArray(model.input) ||
     model.input.length !== HIDDEN ||
-    ![22, INPUTS].some((size) =>
+    ![22, 30, INPUTS].some((size) =>
       model.input.every((row) => vector(row, size)),
     ) ||
     !vector(model.bias, HIDDEN) ||
@@ -244,6 +258,14 @@ export function leadOptions(
           component.highestPower ===
             Math.max(...suitCards.map((c) => effectivePower(c, trump))),
       ),
+      Number(isHighTrumpSingle(component.cards, trump)),
+      Number(
+        isSidePairWithoutAce(component.cards, trump) &&
+          hand.some(
+            (card) => card.kind === 'suited' && isSideAce([card], trump),
+          ),
+      ),
+      Number(isSmallProbe(component.cards, trump)),
     ];
     return {
       cardIds: [...ids],
@@ -338,12 +360,28 @@ export function choosePolicyLead(
       }
     }
   }
+  const styleGuard =
+    model.input[0]!.length >= STYLE_INPUTS
+      ? leadGuard(
+          hand,
+          trump,
+          options[chosen]!.cardIds,
+          options,
+          context,
+          probabilities,
+        )
+      : -1;
+  if (styleGuard >= 0) chosen = styleGuard;
   const teacherIndex = options.findIndex((option) => option.prior > 0);
   record?.({
     options,
     chosen,
     temperature,
-    ...(context.beliefSearch && teacherIndex >= 0 ? { teacherIndex } : {}),
+    ...(styleGuard >= 0
+      ? { teacherIndex: styleGuard, teacherWeight: STYLE_TEACHER_WEIGHT }
+      : context.beliefSearch && teacherIndex >= 0
+        ? { teacherIndex }
+        : {}),
   });
   return options[chosen]!.cardIds;
 }
@@ -376,7 +414,7 @@ export function playOptions(
   const key = (ids: string[]) => [...ids].sort().join('|');
   const unique = new Map(candidates.map((ids) => [key(ids), ids]));
   const ledCategory = lead[0]!.category;
-  return [...unique.values()].map((ids) => {
+  const result: LeadOption[] = [...unique.values()].map((ids) => {
     const cards = hand.filter((card) => ids.includes(card.id));
     const legal = validateFollow(hand, cards, lead, trump);
     const matchesLead = legal.legal && legal.matchesLead;
@@ -463,6 +501,39 @@ export function playOptions(
       prior: key(ids) === key(baseline) ? BASELINE_PRIOR : 0,
     };
   });
+  // Inputs that compare an option with the other legal options.
+  const summaries = summarizeFollows(hand, lead, trump, context, result);
+  const topOpponentPower = Math.max(
+    ...context.winning.map((component) => component.highestPower),
+    0,
+  );
+  const strongestPlain = Math.max(
+    ...summaries.filter((s) => s.wins && !s.joker).map((s) => s.power),
+    -Infinity,
+  );
+  const partnerWinning = teamAt(context.seat) === teamAt(context.winnerSeat);
+  const hasPlainOption = summaries.some((s) => !s.big);
+  for (const [index, summary] of summaries.entries()) {
+    const cheaperWinner = summaries.some((s) => s.wins && !s.big);
+    const highest = Math.max(
+      ...summary.cards.map((card) => effectivePower(card, trump)),
+    );
+    result[index]!.features.push(
+      Number(
+        summary.big &&
+          hasPlainOption &&
+          (partnerWinning ||
+            !summary.wins ||
+            cheaperWinner ||
+            (context.trickPoints ?? 0) < CONTESTED_TRICK_POINTS),
+      ),
+      summary.wins ? (highest - topOpponentPower) / 15 : 0,
+      Number(
+        summary.wins && !summary.joker && summary.power === strongestPlain,
+      ),
+    );
+  }
+  return result;
 }
 
 export function choosePolicyPlay(
@@ -509,12 +580,26 @@ export function choosePolicyPlay(
         )
       : -1;
   if (aceProtection >= 0) chosen = aceProtection;
+  const styleGuard =
+    model.input[0]!.length >= STYLE_INPUTS
+      ? followGuard(
+          context,
+          chosen,
+          summarizeFollows(hand, lead, trump, context, options),
+          probabilities,
+        )
+      : -1;
+  if (styleGuard >= 0) chosen = styleGuard;
+  const teacher = styleGuard >= 0 ? styleGuard : aceProtection;
   record?.({
     options,
     chosen,
     temperature,
-    ...(aceProtection >= 0
-      ? { teacherIndex: aceProtection, teacherWeight: 0.05 }
+    ...(teacher >= 0
+      ? {
+          teacherIndex: teacher,
+          teacherWeight: styleGuard >= 0 ? STYLE_TEACHER_WEIGHT : 0.05,
+        }
       : {}),
   });
   return options[chosen]!.cardIds;

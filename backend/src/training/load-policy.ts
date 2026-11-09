@@ -5,21 +5,27 @@ import { choosePolicyLead, parsePolicy } from './learned-policy.js';
 import type { LeadPolicy, PolicyModel } from './learned-policy.js';
 import { parsePolicyCheckpoint } from './policy-training.js';
 
-/** Serve a saved v10 champion using its original 22-input inference path.
+const LEGACY_CHAMPION_INPUTS: Record<string, number> = {
+  'contextual-leads-v10-adaptive-prior': 22,
+  'contextual-leads-v11-tactical-context': 30,
+};
+
+/** Serve an older saved champion using its original inference path.
  * Training imports still migrate and retire its validation. Live loading must
  * not silently replace a validated champion with a migrated learner.
  */
 function loadCheckpoint(path: string, experimental: boolean) {
   const saved = JSON.parse(readFileSync(path, 'utf8'));
   const checkpoint = parsePolicyCheckpoint(saved);
-  if (
-    !experimental &&
-    saved.policyVersion === 'contextual-leads-v10-adaptive-prior'
-  ) {
+  const legacyInputs = LEGACY_CHAMPION_INPUTS[saved.policyVersion as string];
+  if (!experimental && legacyInputs) {
     const legacy = (model: PolicyModel | null | undefined) => {
       if (!model) return null;
       const parsed = parsePolicy(model);
-      return { ...parsed, input: parsed.input.map((row) => row.slice(0, 22)) };
+      return {
+        ...parsed,
+        input: parsed.input.map((row) => row.slice(0, legacyInputs)),
+      };
     };
     checkpoint.champion = checkpoint.leadChampion = legacy(
       saved.leadChampion ?? saved.champion,

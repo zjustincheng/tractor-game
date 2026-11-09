@@ -22,6 +22,7 @@ import type { PolicyOptimizer } from './policy-update.js';
 import { roundReward } from './policy-reward.js';
 export { roundReward } from './policy-reward.js';
 import { heuristicPolicy } from '../bot-policy.js';
+import { robloxBotPolicy } from './roblox-bot.js';
 import { compareAlternatives } from './counterfactual.js';
 import type { RoundPosition, ComparisonCounts } from './counterfactual.js';
 
@@ -50,6 +51,8 @@ export interface PolicyReport {
   vsArchive: Evaluation | null;
   /** Held-out live Sharp; null when the cheaper gates already failed. */
   vsSharp?: Evaluation | null;
+  /** The Roblox game's built-in bots, which the champion will replace. */
+  vsRoblox?: Evaluation | null;
   promoted: boolean;
   learnerReset?: boolean;
   /** Generations left before another rollback may fire, after this one. */
@@ -61,6 +64,7 @@ export interface PolicyReport {
     baseline: Evaluation;
     champion: Evaluation | null;
     sharp?: Evaluation | null;
+    roblox?: Evaluation | null;
   };
   promotionRevalidation?: {
     validatedAt: string;
@@ -186,6 +190,7 @@ export function resolveLearnerGenerationState(options: {
 }
 const COMPATIBLE_POLICY_VERSIONS = new Set([
   POLICY_VERSION,
+  'contextual-leads-v11-tactical-context',
   'contextual-leads-v10-adaptive-prior',
   'contextual-leads-v4-calibrated-exploration',
   'contextual-leads-v5-adaptive-prior',
@@ -202,6 +207,8 @@ export interface PolicyCheckpoint {
   /** Promotion must also beat live Sharp, an opponent practice never faces.
    * Defaults to on; older checkpoints adopt it on their next generation. */
   sharpGate?: boolean;
+  /** Train on the Roblox game's rules and practice more against its bots. */
+  robloxRules?: boolean;
   nonPromotionStreak?: number;
   generationsSincePromotion?: number;
   /** Generations left before another learner rollback may fire. */
@@ -340,6 +347,7 @@ export function parsePolicyCheckpoint(value: unknown): PolicyCheckpoint {
     followChampion: migrated ? null : followChampion,
     archive: checkpoint.archive.map(parsePolicy),
     sharpGate: checkpoint.sharpGate ?? true,
+    ...(checkpoint.robloxRules === true ? { robloxRules: true } : {}),
     rollbackCooldown: checkpoint.rollbackCooldown ?? 0,
     // A version migration retires the champion, which must re-earn its place,
     // but the archived opponents keep their value as sparring partners: their
@@ -674,8 +682,9 @@ export function trainPolicyGeneration(
   // learner is far ahead of it, the remaining practice is more useful against
   // champion/archive opponents.
   const opponents = [champion, ...archive].filter((p): p is Pair => p !== null);
-  function opponentPolicies(pair: Pair | 'sharp' | null) {
+  function opponentPolicies(pair: Pair | 'sharp' | 'roblox' | null) {
     if (!pair) return {};
+    if (pair === 'roblox') return { opponentPolicy: robloxBotPolicy };
     // Sharp plays with its own validated-throw information, exactly as a player
     // meets it in the app. Practice never faces it, which is the point.
     if (pair === 'sharp') return { opponentPolicy: heuristicPolicy('sharp') };
@@ -698,12 +707,19 @@ export function trainPolicyGeneration(
       generation,
       false,
     ).entries()) {
+      // Half of practice is the handcrafted baseline and the Roblox bots; a
+      // Roblox-rules run spends half on the Roblox bots alone.
+      const playsRoblox = checkpoint.robloxRules
+        ? index % 2 === 1
+        : index % 4 === 1;
       const opponent =
         index % 4 === 0
           ? null
-          : (opponents[
-              (generation + Math.floor(index / 2)) % opponents.length
-            ] ?? null);
+          : playsRoblox
+            ? ('roblox' as const)
+            : (opponents[
+                (generation + Math.floor(index / 2)) % opponents.length
+              ] ?? null);
       for (const candidateTeam of ['A', 'B'] as const) {
         let leadExperiences: PolicyExperience[] = [];
         let followExperiences: PolicyExperience[] = [];
@@ -736,6 +752,7 @@ export function trainPolicyGeneration(
           candidate: DEFAULT_BOT_LEAD_WEIGHTS,
           opponent: DEFAULT_BOT_LEAD_WEIGHTS,
           maxRounds: checkpoint.config.maxRounds,
+          robloxRules: checkpoint.robloxRules === true,
           candidateLead: (hand, trump, context) =>
             choosePolicyLead(
               leadBase,
@@ -924,7 +941,7 @@ export function trainPolicyGeneration(
   onPhase?.('update', performance.now() - updateStarted, 0);
   pending.length = 0;
   function evaluate(
-    opponent: Pair | 'sharp' | null,
+    opponent: Pair | 'sharp' | 'roblox' | null,
     phase: string,
     confirmation = false,
   ): Evaluation {
@@ -967,6 +984,7 @@ export function trainPolicyGeneration(
             candidate: DEFAULT_BOT_LEAD_WEIGHTS,
             opponent: DEFAULT_BOT_LEAD_WEIGHTS,
             maxRounds: checkpoint.config.maxRounds,
+            robloxRules: checkpoint.robloxRules === true,
             candidateLead: (hand, trump, context) =>
               evaluatedPolicy.lead(hand, trump, context, []),
             candidatePlay: evaluatedPolicy.follow,
@@ -1012,13 +1030,19 @@ export function trainPolicyGeneration(
   const sharpGate = checkpoint.sharpGate ?? true;
   const vsSharp = gatesPassed ? evaluate('sharp', 'validation-sharp') : null;
   const sharpPassed = !vsSharp || !sharpGate || policyPasses(vsSharp);
+  const vsRoblox =
+    gatesPassed && sharpPassed ? evaluate('roblox', 'validation-roblox') : null;
+  const robloxPassed = !vsRoblox || policyPasses(vsRoblox);
   const archived =
-    gatesPassed && sharpPassed
+    gatesPassed && sharpPassed && robloxPassed
       ? archive[(generation - 1) % Math.max(1, archive.length)]
       : undefined;
   const vsArchive = archived ? evaluate(archived, 'validation-archive') : null;
   const screened =
-    gatesPassed && sharpPassed && (!vsArchive || policyPasses(vsArchive));
+    gatesPassed &&
+    sharpPassed &&
+    robloxPassed &&
+    (!vsArchive || policyPasses(vsArchive));
   const confirmation = screened
     ? {
         baseline: evaluate(null, 'confirmation-baseline', true),
@@ -1026,13 +1050,15 @@ export function trainPolicyGeneration(
           ? evaluate(champion, 'confirmation-champion', true)
           : null,
         sharp: sharpGate ? evaluate('sharp', 'confirmation-sharp', true) : null,
+        roblox: evaluate('roblox', 'confirmation-roblox', true),
       }
     : null;
   const promoted =
     !!confirmation &&
     policyPasses(confirmation.baseline) &&
     (!confirmation.champion || policyPasses(confirmation.champion)) &&
-    (!confirmation.sharp || policyPasses(confirmation.sharp));
+    (!confirmation.sharp || policyPasses(confirmation.sharp)) &&
+    policyPasses(confirmation.roblox);
   // Keep the exact evaluated prior. Changing it after KL validation silently
   // changes the saved policy and bypasses the update trust limit.
   const nextLeadLearner = parsePolicy(leadLearner);
@@ -1149,6 +1175,7 @@ export function trainPolicyGeneration(
         vsBaseline,
         vsArchive,
         vsSharp,
+        vsRoblox,
         promoted,
         learnerReset: preflightRollback || learnerState.learnerReset,
         rollbackCooldown,

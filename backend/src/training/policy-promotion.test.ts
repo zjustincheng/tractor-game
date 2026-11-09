@@ -12,13 +12,14 @@ import type * as SelfPlay from './self-play.js';
 
 // Live Sharp is the only opponent passed as a whole BotPolicy; learned pairs
 // arrive as individual lead/follow hooks. That is how the stub tells them apart.
-const state = vi.hoisted(() => ({ loseToSharp: false }));
+const state = vi.hoisted(() => ({ loseToSharp: false, loseToRoblox: false }));
 
 // A promotion needs matches the candidate clearly wins on both point and level
 // margin. Real play cannot be steered that way, so the match itself is a stub:
 // the promotion bookkeeping under test never inspects how the cards fell.
 vi.mock('./self-play.js', async (importOriginal) => {
   const original = await importOriginal<typeof SelfPlay>();
+  const { robloxBotPolicy } = await import('./roblox-bot.js');
   return {
     ...original,
     playTrainingMatch: (
@@ -26,7 +27,10 @@ vi.mock('./self-play.js', async (importOriginal) => {
     ) => {
       const candidate = options.candidateTeam;
       const other: Team = candidate === 'A' ? 'B' : 'A';
-      const loses = state.loseToSharp && options.opponentPolicy !== undefined;
+      const facingRoblox = options.opponentPolicy === robloxBotPolicy;
+      const loses = facingRoblox
+        ? state.loseToRoblox
+        : state.loseToSharp && options.opponentPolicy !== undefined;
       const winner = loses ? other : candidate;
       const attackingTeam: Team = loses ? candidate : other;
       const levels = { A: '2', B: '2' } as const;
@@ -122,6 +126,17 @@ describe('promotion saves the evaluated policy', () => {
     // Still measured, so a regression against Sharp stays visible.
     expect(ungated.reports[0]!.vsSharp).not.toBeNull();
     state.loseToSharp = false;
+  }, 30000);
+});
+
+describe('Roblox bot gate', () => {
+  it('refuses promotion when the Roblox bots are not beaten', () => {
+    state.loseToRoblox = true;
+    const blocked = trainPolicyGeneration(startingCheckpoint());
+    state.loseToRoblox = false;
+    expect(blocked.reports[0]!.promoted).toBe(false);
+    expect(blocked.reports[0]!.vsRoblox).not.toBeNull();
+    expect(blocked.leadChampion).toBeNull();
   }, 30000);
 });
 

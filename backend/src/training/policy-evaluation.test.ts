@@ -123,7 +123,7 @@ describe('policy evaluation history', () => {
     const rows = [a, b].map((game) => ({
       file: 'run/games.jsonl',
       generation: 12,
-      policyVersion: 'contextual-leads-v11-tactical-context',
+      policyVersion: 'contextual-leads-v12-play-style',
       result: game,
     }));
     const summary = summarizePolicyHistory(rows).groups[0]!.evaluation;
@@ -177,7 +177,7 @@ describe('policy evaluation history', () => {
         {
           phase: 'validation-baseline',
           generation: 4,
-          policyVersion: 'contextual-leads-v11-tactical-context',
+          policyVersion: 'contextual-leads-v12-play-style',
           result: a,
         },
         'run/games.jsonl',
@@ -185,7 +185,7 @@ describe('policy evaluation history', () => {
     ).toEqual({
       file: 'run/games.jsonl',
       generation: 4,
-      policyVersion: 'contextual-leads-v11-tactical-context',
+      policyVersion: 'contextual-leads-v12-play-style',
       result: a,
     });
     expect(
@@ -209,7 +209,7 @@ describe('policy evaluation history', () => {
       parseHistoricalPolicyGame(
         { phase: 'validation-baseline', generation: 4, result: a },
         'run/games.jsonl',
-        'contextual-leads-v11-tactical-context',
+        'contextual-leads-v12-play-style',
       )?.generation,
     ).toBe(4);
   });

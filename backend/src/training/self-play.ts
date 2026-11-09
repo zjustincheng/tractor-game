@@ -30,6 +30,7 @@ import type {
   Trump,
 } from '@tractor/rules';
 import { legalDeclarations } from '../bot-match.js';
+import { robloxJokerPairs } from './roblox-rules.js';
 import type { LeadPolicy, PlayPolicy } from './learned-policy.js';
 import type { RoundPosition } from './counterfactual.js';
 
@@ -81,6 +82,8 @@ export function playTrainingMatch(options: {
   candidate: BotLeadWeights;
   opponent: BotLeadWeights;
   maxRounds: number;
+  /** Also allow the Roblox game's joker-pair no-trump calls. */
+  robloxRules?: boolean;
   candidatePolicy?: BotPolicy;
   opponentPolicy?: BotPolicy;
   candidateLead?: LeadPolicy;
@@ -140,9 +143,12 @@ export function playTrainingMatch(options: {
       for (let seat = 0; seat < options.playerCount; seat++) {
         const hand = state.hands[seat]!.slice(0, dealt);
         const ids = new Set(hand.map((card) => card.id));
-        const declarationOptions = legalDeclarations(state, seat).filter(
-          (option) => option.cardIds.every((id) => ids.has(id)),
-        );
+        const declarationOptions = [
+          ...legalDeclarations(state, seat).filter((option) =>
+            option.cardIds.every((id) => ids.has(id)),
+          ),
+          ...(options.robloxRules ? robloxJokerPairs(state, seat, hand) : []),
+        ];
         const declarationPolicy =
           teamAt(seat) === options.candidateTeam
             ? (options.candidatePolicy?.declare ?? options.candidateDeclaration)

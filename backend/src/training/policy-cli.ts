@@ -35,6 +35,7 @@ function main(): void {
     '--counterfactual-weight',
     '--players',
     '--sharp-gate',
+    '--rules',
     '--seed',
     '--max-rounds',
     '--resume',
@@ -58,6 +59,9 @@ function main(): void {
       'Resume keeps the saved deal stream and round cap; omit --seed and --max-rounds',
     );
   const sharpGateOption = options.get('--sharp-gate');
+  const rulesOption = options.get('--rules');
+  if (rulesOption && !['website', 'roblox'].includes(rulesOption))
+    throw new Error('--rules takes website or roblox');
   if (sharpGateOption && !['on', 'off'].includes(sharpGateOption))
     throw new Error('--sharp-gate takes on or off');
   const rawCheckpoint = resume
@@ -144,6 +148,8 @@ function main(): void {
   }
   if (sharpGateOption)
     checkpoint = { ...checkpoint, sharpGate: sharpGateOption === 'on' };
+  if (rulesOption)
+    checkpoint = { ...checkpoint, robloxRules: rulesOption === 'roblox' };
   if (resume)
     console.log(
       'Resume keeps learner weights; older policies must pass the new evaluation before becoming champion.',
@@ -279,6 +285,12 @@ function main(): void {
         `Learned logit spread: mean ${report.evaluationLogits.meanSpread.toFixed(3)}, ` +
           `p90 ${report.evaluationLogits.p90Spread.toFixed(3)}, ` +
           `baseline prior ${report.evaluationLogits.baselinePrior.toFixed(3)}`,
+      );
+    if (report.vsRoblox)
+      console.log(
+        `Roblox bots: ${report.vsRoblox.wins}/${report.vsRoblox.games}, ` +
+          `levels ${report.vsRoblox.levelMarginMean?.toFixed(2) ?? 'n/a'} ` +
+          `[${report.vsRoblox.levelMarginLow?.toFixed(2) ?? 'n/a'}, ${report.vsRoblox.levelMarginHigh?.toFixed(2) ?? 'n/a'}]`,
       );
     if (report.vsSharp)
       console.log(

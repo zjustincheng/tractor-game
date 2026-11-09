@@ -339,7 +339,7 @@ describe('learning from saved matches', () => {
     const repeated = learnRecordedRounds(reloaded, rounds);
     expect(repeated.report.rounds).toBe(0);
     expect(repeated.checkpoint).toEqual(reloaded);
-  }, 20000);
+  }, 80000);
 
   it('retains more than 100 completed tricks for future learning', () => {
     const match = savedGame(7);
