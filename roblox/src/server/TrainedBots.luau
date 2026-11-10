@@ -587,28 +587,86 @@ return function(Cards, S, Rules, Model)
     return result
   end
 
+  -- Matches robloxBurialChoices in backend/src/training/learned-policy.ts.
   function Trained.burialOptions(cards, size, trump)
-    local baseline = Trained.baselineBurial(cards, size, trump)
-    local pointSaving = stableSort(cards, function(a, b)
-      if Cards.points(a) ~= Cards.points(b) then return Cards.points(a) - Cards.points(b) end
-      return Cards.power(a, trump) - Cards.power(b, trump)
-    end)
-    local sideFirst = stableSort(cards, function(a, b) return number(isTrump(a, trump)) - number(isTrump(b, trump)) end)
+    local order = Rules.chooseBurial(cards, #cards, trump)
     local function firstIds(list)
       local ids = {}
       for index = 1, size do ids[index] = list[index].id end
       return ids
     end
+    -- Empty the shortest suits outright, then fall back to the Roblox order.
+    local suits, bySuit = {}, {}
+    for _, card in ipairs(order) do
+      if not isTrump(card, trump) then
+        local group = Cards.category(card, trump)
+        if not bySuit[group] then
+          bySuit[group] = {}
+          table.insert(suits, bySuit[group])
+        end
+        table.insert(bySuit[group], card)
+      end
+    end
+    local voiding, taken = {}, {}
+    for _, suit in ipairs(stableSort(suits, function(a, b) return #a - #b end)) do
+      if #voiding + #suit <= size then
+        for _, card in ipairs(suit) do
+          table.insert(voiding, card.id)
+          taken[card.id] = true
+        end
+      end
+    end
+    for _, card in ipairs(order) do
+      if #voiding < size and not taken[card.id] then table.insert(voiding, card.id) end
+    end
+    -- The Roblox order, but point cards go only when nothing else is left.
+    local savingPoints = stableSort(order, function(a, b)
+      local at, bt = number(isTrump(a, trump)), number(isTrump(b, trump))
+      if at ~= bt then return at - bt end
+      return number(Cards.points(a) > 0) - number(Cards.points(b) > 0)
+    end)
+
+    local function suitLengths(list)
+      local lengths, total = {}, 0
+      for _, card in ipairs(list) do
+        if not isTrump(card, trump) then
+          local group = Cards.category(card, trump)
+          if not lengths[group] then total = total + 1 end
+          lengths[group] = (lengths[group] or 0) + 1
+        end
+      end
+      return lengths, total
+    end
+    local function identities(list)
+      local counts = {}
+      for _, card in ipairs(list) do
+        local key = S.identity(card)
+        counts[key] = (counts[key] or 0) + 1
+      end
+      return counts
+    end
+    local _, suitsBefore = suitLengths(cards)
+    local allCounts = identities(cards)
+
     local options, seen = {}, {}
-    local baselineKey = table.concat(baseline, '|')
-    for _, ids in ipairs({ baseline, firstIds(pointSaving), firstIds(sideFirst) }) do
-      local key = table.concat(ids, '|')
+    for index, ids in ipairs({ firstIds(order), voiding, firstIds(savingPoints) }) do
+      local key = sortedKey(ids)
       if not seen[key] then
         seen[key] = true
         local selected = selectIds(cards, ids)
+        local wanted = {}
+        for _, id in ipairs(ids) do wanted[id] = true end
+        local kept = filter(cards, function(card) return not wanted[card.id] end)
+        local after, suitsAfter = suitLengths(kept)
+        local shortest = math.huge
+        for _, length in pairs(after) do shortest = math.min(shortest, length) end
+        local remaining, brokenPairs = identities(kept), 0
+        for identity, total in pairs(allCounts) do
+          if total >= 2 and (remaining[identity] or 0) == 1 then brokenPairs = brokenPairs + 1 end
+        end
         table.insert(options, {
           cardIds = ids,
-          prior = key == baselineKey and BASELINE_PRIOR or 0,
+          prior = index == 1 and BASELINE_PRIOR or 0,
           features = {
             0,
             #cards / 30,
@@ -617,6 +675,9 @@ return function(Cards, S, Rules, Model)
             powerOf(selected, trump) / 100,
             count(selected, isJoker) / 2,
             number(count(selected, isJoker) > 0),
+            (suitsBefore - suitsAfter) / 4,
+            brokenPairs / math.max(1, #selected),
+            suitsAfter > 0 and shortest / 13 or 0,
           },
         })
       end

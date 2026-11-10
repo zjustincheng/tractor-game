@@ -430,9 +430,26 @@ for (const playerCount of [4, 6, 8, 10])
       models,
       baseline: chooseBotBurial(burialCards, size, t),
       roblox: robloxBurial(burialCards, size, t),
-      expected: choosePolicyBurial(models.follow, burialCards, size, t),
+      expected: choosePolicyBurial(
+        models.follow,
+        burialCards,
+        size,
+        t,
+        undefined,
+        undefined,
+        true,
+      ),
       champion:
-        champion && choosePolicyBurial(champion.follow, burialCards, size, t),
+        champion &&
+        choosePolicyBurial(
+          champion.follow,
+          burialCards,
+          size,
+          t,
+          undefined,
+          undefined,
+          true,
+        ),
     });
     for (let seat = 0; seat < playerCount; seat++) {
       const declarations = declarationsForHand(
