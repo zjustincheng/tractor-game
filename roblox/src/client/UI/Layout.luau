@@ -21,6 +21,8 @@ C.updateAction = function()
   -- In play the hint starts empty; the branches below fill it when they have
   -- something to say, so lobby text never lingers at the table.
   if current and not current.done then handHint.Text = '' end
+  -- The mail dot only shows while the one-time mailbox bonus is unclaimed.
+  if home.mailDot then home.mailDot.Visible = not (C.state and C.state.mailClaimed) end
 
   home.view.Visible = isHome and C.lobbyMode == 'home' and not (current and current.done)
   tier.view.Visible = isHome and C.lobbyMode == 'tier' and not (current and current.done)

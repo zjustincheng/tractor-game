@@ -588,13 +588,14 @@ function arenaUI.initMailModal()
 
   local mailCard2 = frame(mModal, 'Mail2', palette.tileBg, 10)
   outline(mailCard2, palette.panelBorder, 1)
-  local m2Title = label(mailCard2, 'Title', 'Daily Welfare Grant', 12, palette.goldBright)
+  local m2Title = label(mailCard2, 'Title', 'Starter Bonus', 12, palette.goldBright)
   m2Title.Font = Enum.Font.GothamBold
   m2Title.TextXAlignment = Enum.TextXAlignment.Left
-  local m2Body = label(mailCard2, 'Body', 'Play matches, communicate with table emotes, and claim your +500 welfare bonus!', 10, palette.cream)
+  local m2Body = label(mailCard2, 'Body', 'Play matches, chat with table emotes, and enjoy +500 more on us. One mailbox bonus per player.', 10, palette.cream)
   m2Body.TextXAlignment = Enum.TextXAlignment.Left
 
   local claimMailBtn = button(mModal, 'ClaimMail', 'CLAIM MAILBOX BONUS (+1.5K COINS)', function()
+    if C.state and C.state.mailClaimed then mShade.Visible = false return end
     remote:FireServer('claim_mail')
     if home and home.mailDot then home.mailDot.Visible = false end
     task.delay(0.2, function() mShade.Visible = false end)
@@ -621,6 +622,9 @@ function arenaUI.initMailModal()
   end
 
   C.openMailModal = function()
+    local claimed = C.state and C.state.mailClaimed
+    claimMailBtn.Text = claimed and 'BONUS ALREADY CLAIMED' or 'CLAIM MAILBOX BONUS (+1.5K COINS)'
+    claimMailBtn.AutoButtonColor = not claimed
     layoutMail()
     mShade.Visible = true
   end

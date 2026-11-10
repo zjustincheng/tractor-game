@@ -438,7 +438,7 @@ home.friendsBtn.TextSize = 13
 function arenaUI.placeLobbyList(rank)
   local w, h = home.heroW, home.heroH
   if not w then return end
-  local top = rank and 142 or 50
+  local top = rank and (home.rankCompact and 116 or 142) or 50
   rect(home.lobbyHeading, 8, top, w - 16, 18)
   rect(home.lobbyList, 8, top + 22, w - 16, h - (top + 22) - 48)
   rect(home.lobbyEmpty, 8, 8, w - 36, 34)
@@ -452,12 +452,30 @@ function arenaUI.layoutHeroCard(w, h)
   rect(home.moneyToggle, 8, 8, half, 34)
   rect(home.rankToggle, 8 + half + 6, 8, w - 16 - 6 - half, 34)
   local cardW = w - 16
-  rect(home.rankCard, 8, 48, cardW, 86)
-  rect(home.rankMedal, 12, 15, 56, 56)
-  rect(home.rankName, 78, 8, cardW - 86, 36)
-  rect(home.rankProgress, 78, 44, cardW - 86, 16)
-  rect(home.rankSeasonLabel, cardW - 150, 47, 140, 12)
-  rect(home.rankBar, 78, 63, cardW - 92, 10)
+  -- Short screens (phones held sideways) get a slimmer card so the lobby
+  -- list keeps room; the season line moves under the bar on its own row.
+  home.rankCompact = h < 300
+  if home.rankCompact then
+    rect(home.rankCard, 8, 48, cardW, 60)
+    rect(home.rankMedal, 8, 8, 44, 44)
+    home.rankStar.TextSize = 24
+    home.rankName.TextSize = 20
+    rect(home.rankName, 60, 4, cardW - 68, 24)
+    rect(home.rankProgress, 60, 28, cardW - 68, 14)
+    rect(home.rankBar, 60, 44, cardW - 72, 6)
+    home.rankSeasonLabel.Visible = false
+  else
+    rect(home.rankCard, 8, 48, cardW, 86)
+    rect(home.rankMedal, 12, 15, 56, 56)
+    home.rankStar.TextSize = 32
+    home.rankName.TextSize = 26
+    rect(home.rankName, 78, 6, cardW - 86, 32)
+    rect(home.rankProgress, 78, 38, cardW - 86, 16)
+    rect(home.rankBar, 78, 56, cardW - 92, 10)
+    home.rankSeasonLabel.Visible = true
+    home.rankSeasonLabel.TextXAlignment = Enum.TextXAlignment.Left
+    rect(home.rankSeasonLabel, 78, 69, cardW - 86, 12)
+  end
   rect(home.friendsBtn, 8, h - 40, w - 16, 32)
   arenaUI.placeLobbyList(C.playFor == 'rank')
 end
@@ -1248,6 +1266,7 @@ function arenaUI.layoutFriends(w, h, narrow)
   rect(friends.header, 12, 10, w - 24, 46)
   rect(friends.backBtn, 10, 7, 86, 32)
   rect(friends.title, 106, 12, w - 24 - 212, 22)
+  friends.title.Text = narrow and 'FRIENDS' or 'PLAY WITH FRIENDS'
   local top, gap, panelH = 66, 10, h - 66 - 12
   local squadW, squadH, privateX, privateY, privateW, privateH
   if narrow then

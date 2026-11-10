@@ -312,6 +312,22 @@ for _, score in ipairs({ 80, 119, 120, 160, 200, 240, 280 }) do table.insert(gra
 assert(table.concat(grades, ',') == '1,1,2,3,4,5,6', table.concat(grades, ','))
 assert(Scoring.payoutGrade('defenders', 180, 6) == 2, 'Six players step every 60 past 120')
 assert(Scoring.payoutGrade('attackers', 0, 4) == 4 and Scoring.payoutGrade('attackers', 30, 4) == 2 and Scoring.payoutGrade('attackers', 60, 4) == 1)
+-- The mailbox bonus pays once per player, also after leaving and rejoining.
+do
+  if not _G.sessions[player] then players.PlayerAdded.handler(player); command('sync') end
+  _G.sessions[player].mailClaimed = false
+  local before = _G.sessions[player].coins
+  command('claim_mail')
+  assert(latest.coins == before + 1500 and latest.mailClaimed, 'The mailbox pays 1.5K once')
+  command('claim_mail')
+  assert(latest.coins == before + 1500 and latest.message:find('already claimed'), 'A second claim pays nothing')
+  players.PlayerRemoving.handler(player)
+  players.PlayerAdded.handler(player)
+  command('sync')
+  command('claim_mail')
+  assert(latest.mailClaimed and latest.coins == before + 1500, 'Rejoining does not reset the mailbox')
+end
+
 -- A finished Ranked season pays every tier reached, once, and starts the
 -- next season at 0. Gold I pays its coins plus the frames and titles of Bronze, Silver and Gold.
 do
@@ -331,4 +347,4 @@ do
   assert(s.coins == coins + 250000 and not (latest.message or ''):find('Season 1 ended'), 'Rewards are paid once')
   Catalog.rankSeason.start = start
 end
-print('PASS: real command handler with service doubles: season rewards, stale commands, Chao Di, settlement, replay safety, full-match rounds, purchases, cooldown, saved progress, daily limit, data sanitizing, load-failure safety, end-of-round point coins, open-ended payout grades, reaction broadcasts and saved stats')
+print('PASS: real command handler with service doubles: season rewards, one-time mailbox, stale commands, Chao Di, settlement, replay safety, full-match rounds, purchases, cooldown, saved progress, daily limit, data sanitizing, load-failure safety, end-of-round point coins, open-ended payout grades, reaction broadcasts and saved stats')

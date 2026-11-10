@@ -1637,6 +1637,8 @@ remote.OnServerEvent:Connect(function(player, action, value, revision)
     if not session.mailClaimed then
       session.mailClaimed = true
       session.coins = session.coins + 1500
+      -- Save at once so a quick server hop cannot load an unclaimed copy.
+      task.spawn(saveProgress, player, session, true)
       send(player, session, '✉️ Club Mailbox Bonus Claimed! +1.5K Coins added!', 1500)
     else
       send(player, session, 'Mailbox rewards already claimed!')
