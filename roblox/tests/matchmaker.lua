@@ -6,7 +6,7 @@ local function ticket(userIds, options)
   options = options or {}
   nextId = nextId + 1
   return { id = 't' .. nextId, userIds = userIds, playerCount = options.playerCount or 4, tier = options.tier or 'novice',
-    fullMatch = options.fullMatch or false, fill = options.fill ~= false, queuedAt = options.at or 0 }
+    fullMatch = options.fullMatch or false, ranked = options.ranked, rankTier = options.rankTier, fill = options.fill ~= false, queuedAt = options.at or 0 }
 end
 local function teamOf(seat) return seat % 2 == 1 and 'A' or 'B' end
 local function sameTeam(match, a, b)
@@ -64,4 +64,34 @@ assert(#matches == 0 and #waiting == 4)
 -- Oldest first: with five solos for one table, the newest waits.
 matches, waiting = Matchmaker.form({ ticket({ 1 }, { at = 1 }), ticket({ 2 }, { at = 2 }), ticket({ 3 }, { at = 3 }), ticket({ 4 }, { at = 4 }), ticket({ 5 }, { at = 5 }) }, 6)
 assert(#matches == 1 and #waiting == 1 and waiting[1].userIds[1] == 5)
+-- Ranked is its own queue and waits longer for real opponents.
+matches, waiting = Matchmaker.form({ ticket({ 1 }, { at = 0, ranked = true }), ticket({ 2 }, { at = 0 }) }, 30)
+assert(#matches == 1 and not matches[1].ranked and matches[1].seats[1] == 2, 'Unranked launches at the normal wait')
+assert(#waiting == 1 and waiting[1].ranked, 'Ranked is still waiting for people')
+matches, waiting = Matchmaker.form({ ticket({ 1 }, { at = 0, ranked = true }) }, Matchmaker.RANKED_WAIT)
+assert(#matches == 1 and matches[1].ranked == true and #waiting == 0, 'Ranked fills with bots after its longer wait')
+matches = Matchmaker.form({ ticket({ 1 }, { at = 0, ranked = true }), ticket({ 2 }, { at = 1, ranked = true }), ticket({ 3 }, { at = 2, ranked = true }), ticket({ 4 }, { at = 3, ranked = true }) }, 4)
+assert(#matches == 1 and matches[1].humans == 4 and matches[1].ranked == true, 'A full Ranked table launches at once')
+
+-- Ranked matches people of similar rank first, then widens while waiting.
+local function rankedTicket(id, rank, at) return ticket({ id }, { ranked = true, rankTier = rank, at = at }) end
+local function seated(match, id)
+  for _, userId in pairs(match.seats) do if userId == id then return true end end
+  return false
+end
+local pool = { rankedTicket(1, 1, 0), rankedTicket(2, 1, 1), rankedTicket(3, 6, 2), rankedTicket(4, 2, 3) }
+matches, waiting = Matchmaker.form(pool, 5)
+assert(#matches == 0 and #waiting == 4, 'three near-rank players and a Master still wait')
+table.insert(pool, rankedTicket(5, 2, 4))
+matches, waiting = Matchmaker.form(pool, 6)
+assert(#matches == 1 and not seated(matches[1], 3) and #waiting == 1 and waiting[1].userIds[1] == 3, 'the Master is left out')
+matches = Matchmaker.form({ rankedTicket(1, 1, 0), rankedTicket(2, 3, 1), rankedTicket(3, 3, 2), rankedTicket(4, 1, 3) }, 16)
+assert(#matches == 1 and matches[1].humans == 4, 'two tiers apart is allowed after 15 seconds')
+matches = Matchmaker.form({ rankedTicket(1, 1, 0), rankedTicket(2, 6, 1), rankedTicket(3, 6, 2), rankedTicket(4, 1, 3) }, 31)
+assert(#matches == 1 and matches[1].humans == 4, 'anyone is allowed after 30 seconds')
+matches, waiting = Matchmaker.form({ rankedTicket(9, 6, 0), rankedTicket(1, 1, 1), rankedTicket(2, 1, 2), rankedTicket(3, 1, 3), rankedTicket(4, 1, 4) }, 5)
+assert(#matches == 1 and not seated(matches[1], 9) and #waiting == 1 and waiting[1].userIds[1] == 9, 'a lone Master does not hold up others')
+matches = Matchmaker.form({ rankedTicket(9, 6, 0) }, Matchmaker.RANKED_WAIT)
+assert(#matches == 1 and matches[1].humans == 1, 'bots fill after the Ranked wait')
+
 print('PASS: matchmaker keeps squads on one team, fill on/off, waits then launches with bots, separates modes, oldest first')

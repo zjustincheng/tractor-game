@@ -46,6 +46,8 @@ return function(Cards, S, Rules, Scoring, Trained)
       dealingDuration=duration,deadline=now+duration+Practice.DECLARE_SECONDS,events={},turn=dealer,trick={},lastTrick={},history={},
       tricks=0,points={0,0},penaltyPoints=0,revision=options.revision or 0,done=false,botDeclarations={},
       humans=options.humans or {[1]=true}}
+    -- Ranked plays for Rank Points only, so it has no Double (a coin stake).
+    state.ranked = options.ranked == true or nil
     for seat=1,count do state.hands[seat]={} end
     for i,card in ipairs(deck) do
       if i<=config.cardCount-config.kittySize then table.insert(state.hands[(dealer+i-2)%count+1],card)
@@ -308,6 +310,7 @@ return function(Cards, S, Rules, Scoring, Trained)
       state.doubleDeadline = now + Practice.DOUBLE_SECONDS
       state.revision = state.revision + 1
       table.insert(state.events, { kind = 'chaodi_done', dealer = state.dealer, multiplier = state.chaodiMultiplier or 1, at = now })
+      if state.ranked then Practice.endDoubling(state, now, true) end
       return true
     else
       local nextSeat = (seat % state.playerCount) + 1
@@ -561,7 +564,7 @@ return function(Cards, S, Rules, Scoring, Trained)
       phase=state.phase,dealingStartedAt=state.dealingStartedAt,dealingDuration=state.dealingDuration,deadline=state.deadline,
       declaration=state.declaration,dealer=state.dealer,kittyHolder=state.kittyHolder,error=state.error,options=Practice.options(state,seat),hand=state.hands[seat],
       chaodiTurn=state.chaodiTurn,chaodiMultiplier=state.chaodiMultiplier or 1,chaodiCount=state.chaodiCount or 0,chaodiDeadline=state.chaodiDeadline,
-      doubleDeadline=state.doubleDeadline,
+      doubleDeadline=state.doubleDeadline,ranked=state.ranked,
       chaodiOptions=Practice.chaodiOptions(state,seat),
       counts=counts,trump=state.trump,turn=state.turn,trick=state.trick,lastTrick=state.lastTrick,winnerSeat=state.winnerSeat,
       lastWinnerSeat=state.lastWinnerSeat,tricks=state.tricks,points=state.points,revision=state.revision,done=state.done,tier=state.tier,

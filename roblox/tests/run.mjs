@@ -43,6 +43,7 @@ for (const suite of [
   'tracker',
   'pass',
   'streak',
+  'ranked',
   'practice',
   'trained',
   'setup',

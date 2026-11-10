@@ -112,14 +112,14 @@ local function render(data)
   coinsTab.BackgroundColor3 = ranked and color(50, 58, 96) or color(220, 140, 30)
   rankedTab.BackgroundColor3 = ranked and color(220, 140, 30) or color(50, 58, 96)
   headerTitle.Text = ranked and '🏆 RANKED LADDER' or '🏆 RICHEST PLAYERS'
-  headerSub.Text = ranked and 'WIN ROUNDS TO CLIMB · TOP 50' or 'TOP 50 · ALL SERVERS'
+  headerSub.Text = ranked and 'PLAY RANKED TO CLIMB · TOP 50' or 'TOP 50 · ALL SERVERS'
   if ranked then
     local entries = data.rankEntries or {}
     if not data.available then
       status.Text = 'The ladder turns on once the game is published and saving works.'
       status.Visible = true
     elseif #entries == 0 then
-      status.Text = 'Nobody is ranked yet. Win a round to take the first spot!'
+      status.Text = 'Nobody is ranked yet. Win a Ranked round to take the first spot!'
       status.Visible = true
     end
     local place

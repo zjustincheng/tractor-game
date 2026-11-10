@@ -12,7 +12,7 @@ function arenaUI.initCatalogRows()
     -- Every shop tab now draws its own tiles: Coins & VIP in the CoinShop
     -- module, Emotes, Card Backs and Felts in ShopGrid. These rows are no
     -- longer built.
-    if item.category == 'product' or item.category == 'cardBack' or item.category == 'felt' or item.category == 'emote' or not item.category then continue end
+    if not (item.category == 'product' or item.category == 'cardBack' or item.category == 'felt' or item.category == 'emote' or not item.category ) then
     local parentContainer = categoryContainers[item.category or 'emote'] or categoryContainers.emote
 
     local row = frame(parentContainer, 'ItemRow_' .. item.id, palette.tileBg, 10)
@@ -84,6 +84,7 @@ function arenaUI.initCatalogRows()
       button = control,
       item = item,
     }
+    end
   end
 end
 arenaUI.initCatalogRows()

@@ -10,9 +10,21 @@
 return function()
   local Matchmaker = {}
   Matchmaker.MAX_WAIT = 20
+  -- Ranked waits longer for real opponents before bots fill the seats.
+  Matchmaker.RANKED_WAIT = 45
+  -- Ranked tables start with players within one tier of the oldest ticket and
+  -- widen as it waits: two tiers after 15 seconds, anyone after 30.
+  function Matchmaker.rankGap(waited)
+    if waited >= 30 then return math.huge end
+    return waited >= 15 and 2 or 1
+  end
+  local function rankFits(anchor, ticket, now)
+    if not anchor.ranked then return true end
+    return math.abs((ticket.rankTier or 0) - (anchor.rankTier or 0)) <= Matchmaker.rankGap(now - anchor.queuedAt)
+  end
 
   function Matchmaker.modeKey(ticket)
-    return ticket.playerCount .. ':' .. ticket.tier .. ':' .. (ticket.fullMatch and 'full' or 'quick')
+    return ticket.playerCount .. ':' .. ticket.tier .. ':' .. (ticket.fullMatch and 'full' or 'quick') .. (ticket.ranked and ':ranked' or '')
   end
 
   function Matchmaker.teamSize(playerCount) return playerCount / 2 end
@@ -68,11 +80,18 @@ return function()
         if a.queuedAt ~= b.queuedAt then return a.queuedAt < b.queuedAt end
         return tostring(a.id) < tostring(b.id)
       end)
-      local used = {}
+      local used, skipped = {}, {}
+      local ranked = pool[1].ranked == true
       while true do
         local anchor
-        for _, ticket in ipairs(pool) do if not used[ticket] then anchor = ticket; break end end
-        if not anchor then break end
+        for _, ticket in ipairs(pool) do if not used[ticket] and not skipped[ticket] then anchor = ticket; break end end
+        if not anchor then
+          -- Ranked tickets that could not form a table all keep waiting.
+          if ranked then
+            for _, ticket in ipairs(pool) do if not used[ticket] then table.insert(waiting, ticket) end end
+          end
+          break
+        end
         local size = Matchmaker.teamSize(anchor.playerCount)
         local teams = { { tickets = {} }, { tickets = {} } }
         place(teams, anchor, size)
@@ -87,13 +106,13 @@ return function()
         local humans = #anchor.userIds
         for _, ticket in ipairs(rest) do
           if humans >= anchor.playerCount then break end
-          if place(teams, ticket, size) then
+          if rankFits(anchor, ticket, now) and place(teams, ticket, size) then
             table.insert(chosen, ticket)
             humans = humans + #ticket.userIds
           end
         end
         local full = humans >= anchor.playerCount
-        if full or now - anchor.queuedAt >= maxWait then
+        if full or now - anchor.queuedAt >= (anchor.ranked and Matchmaker.RANKED_WAIT or maxWait) then
           local seats = {}
           for teamIndex, team in ipairs(teams) do
             local free = seatsFor(teamIndex, anchor.playerCount)
@@ -106,8 +125,12 @@ return function()
             end
           end
           for _, ticket in ipairs(chosen) do used[ticket] = true end
-          table.insert(matches, { key = key, playerCount = anchor.playerCount, tier = anchor.tier, fullMatch = anchor.fullMatch,
+          table.insert(matches, { key = key, playerCount = anchor.playerCount, tier = anchor.tier, fullMatch = anchor.fullMatch, ranked = anchor.ranked,
             tickets = chosen, seats = seats, humans = humans })
+        elseif ranked then
+          -- A ranked ticket with nobody near its rank yet must not hold up
+          -- players behind it who could already play each other.
+          skipped[anchor] = true
         else
           -- The oldest ticket keeps waiting; so does everyone behind it.
           for _, ticket in ipairs(pool) do if not used[ticket] then table.insert(waiting, ticket) end end

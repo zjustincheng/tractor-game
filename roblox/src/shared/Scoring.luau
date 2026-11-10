@@ -23,6 +23,24 @@ return function(Cards)
     if steps == 0 then return grade, '破庄 (Overturn)' end
     return grade, '闲家 +' .. steps .. ' (Challengers ×' .. grade .. ')'
   end
+  -- Ranked Points for one round. `margin` is the round's payout grade (1-4):
+  -- a narrow hold or overturn is 1, a shutout or a big overturn is 4, so a
+  -- more decisive win earns more and a heavier loss costs more:
+  --   against people   win +30 / +40 / +50 / +60   loss -25 / -30 / -35 / -40
+  --   against bots     win +15 / +20 / +25 / +30   loss -17 / -20 / -23 / -26
+  -- Bot-only games stop counting at `botCap`, in both directions; a human
+  -- opponent always counts. Bronze (under 100) never loses points. Returns the
+  -- change and whether the bot cap held it at zero.
+  function Scoring.rankDelta(before, won, vsPeople, margin, botCap)
+    margin = math.max(1, math.min(4, margin or 1))
+    if not vsPeople and before >= botCap then return 0, true end
+    if won then
+      if vsPeople then return 20 + 10 * margin, false end
+      return math.min(10 + 5 * margin, botCap - before), false
+    end
+    if before < 100 then return 0, false end
+    return vsPeople and -(20 + 5 * margin) or -(14 + 3 * margin), false
+  end
   function Scoring.advance(level, steps)
     local start, jack = 1,10
     for i, rank in ipairs(Cards.ranks) do if rank == level then start=i end; if rank=='J' then jack=i end end

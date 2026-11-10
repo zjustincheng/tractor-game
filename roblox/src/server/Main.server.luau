@@ -112,6 +112,16 @@ if progressStore then
   pcall(function() rankStore = game:GetService('DataStoreService'):GetOrderedDataStore('TractorRank_v1') end)
 end
 local rankBoard = { entries = {}, updatedAt = 0 }
+-- Bot-only Ranked games stop moving your points once you reach Gold.
+local BOT_RANK_CAP = 250
+-- Position of a player's tier in Catalog.ranks (1 = Bronze), for matchmaking.
+local function rankIndex(points)
+  local index = 1
+  for position, tier in ipairs(Catalog.ranks or {}) do
+    if (points or 0) >= tier.at then index = position end
+  end
+  return index
+end
 local function rankName(points)
   local name = 'Bronze'
   for _, tier in ipairs(Catalog.ranks or {}) do
@@ -201,6 +211,9 @@ local BOT_NAMES = { 'Telamon', 'Shedletsky', 'Builderman', 'Roblox', 'Matt Dusek
 local BOT_IDS = { 13645, 261, 156, 1, 16, 18, 20, 158, 684360, 2868 }
 local PUBLIC_WAIT_SECONDS = 6 -- a public table waits this long for others to join
 local TURN_SECONDS = { tricks = 25, kitty = 45 } -- only enforced with 2+ people
+-- After two timeouts in a row a person counts as away: their turns are played
+-- for them after this many seconds until they act again.
+local AWAY_SECONDS = 3
 local REVIEW_SECONDS = 2.5 -- completed tricks auto-advance with 2+ people
 
 local function relSeat(tbl, viewer, abs) return (abs - viewer) % tbl.playerCount + 1 end
@@ -316,6 +329,8 @@ local function send(player, session, message, coinBonus)
     stats = session.stats,
     rejoinOffer = (session.rejoinOffer or 0) > os.time() or nil,
     vip = session.vip == true,
+    rankPoints = session.stats and session.stats.rankPoints or 0,
+    rankTier = rankName(session.stats and session.stats.rankPoints or 0),
     pass = session.pass,
     markersLeft = Persistence.markersLeft(session),
     serverTime = os.clock(),
@@ -388,7 +403,9 @@ local function payTrickCoins(session, state)
       if points > 0 and entry.winnerSeat % 2 == 1 then
         local coins = points * (POINT_COINS[state.tier] or POINT_COINS.novice)
         session.matchTrickCoins = (session.matchTrickCoins or 0) + coins
-        session.vaultCoins = (session.vaultCoins or 0) + math.max(50, math.floor(points * 2))
+        if not (session.table and session.table.ranked) then
+          session.vaultCoins = (session.vaultCoins or 0) + math.max(50, math.floor(points * 2))
+        end
         paid = paid + coins
         if session.quests and session.quests.points then
           session.quests.points.progress = math.min(session.quests.points.target, session.quests.points.progress + points)
@@ -457,7 +474,7 @@ local function startGame(tbl, now)
   tbl.roundKey = tbl.id .. ':' .. tbl.serial
   local revision = tbl.game and tbl.game.revision + 1 or 0
   tbl.game = Practice.new(pick, now, { playerCount = tbl.playerCount, quickMatch = not tbl.fullMatch, dealingDuration = 5.5,
-    paced = isLive, humans = humans, revision = revision })
+    paced = isLive, humans = humans, revision = revision, ranked = tbl.ranked })
   tbl.game.tier = tbl.tier
   local hostSession = tbl.host and sessions[tbl.host]
   local botScale = math.clamp(hostSession and hostSession.coins or cfg.base * 20, cfg.base * 10, cfg.base * 50)
@@ -623,6 +640,8 @@ end
 
 local function seatAt(player, session, tbl, seat)
   tbl.members[seat] = player
+  if tbl.timeouts then tbl.timeouts[seat] = nil end
+  if tbl.away then tbl.away[seat] = nil end
   session.table, session.seat, session.game = tbl, seat, tbl.game
   if tbl.game then Practice.setHuman(tbl.game, seat, true) end
 end
@@ -632,7 +651,7 @@ end
 local function launchLocalMatch(match, now)
   nextTableId = nextTableId + 1
   local tbl = { id = nextTableId, playerCount = match.playerCount, tier = match.tier, fullMatch = match.fullMatch,
-    private = false, members = {}, serial = 0 }
+    ranked = match.ranked, private = false, members = {}, serial = 0 }
   tables[tbl.id] = tbl
   for _, seat in ipairs(seatOrder(match.playerCount)) do
     local player = match.seats[seat] and playerByUserId(match.seats[seat])
@@ -662,9 +681,11 @@ local function startSearch(player, session, options, cfg, now)
     send(player, session, 'Only the squad leader can start matchmaking.') return
   end
   local members = squadMembers(player, session)
-  local userIds = {}
+  local userIds, rankTier = {}, 0
   for _, member in ipairs(members) do
     local memberSession = sessions[member]
+    -- A squad is matched by its highest-ranked member.
+    if memberSession then rankTier = math.max(rankTier, rankIndex(memberSession.stats and memberSession.stats.rankPoints)) end
     if memberSession and memberSession.coins < cfg.min then
       send(player, session, member.DisplayName .. ' needs ' .. formatK(cfg.min) .. ' coins for ' .. cfg.name .. '.') return
     end
@@ -672,7 +693,7 @@ local function startSearch(player, session, options, cfg, now)
   end
   nextTicketId = nextTicketId + 1
   local ticket = { id = tostring(game.JobId or 'local') .. ':' .. nextTicketId, userIds = userIds, playerCount = options.playerCount,
-    tier = options.tier, fullMatch = options.fullMatch, fill = true,
+    tier = options.tier, fullMatch = options.fullMatch, ranked = options.ranked, rankTier = options.ranked and rankTier or nil, fill = true,
     queuedAt = crossServer and os.time() or now }
   local valid, problem = Matchmaker.valid(ticket)
   if not valid then send(player, session, problem) return end
@@ -682,7 +703,7 @@ local function startSearch(player, session, options, cfg, now)
     if memberSession then
       if memberSession.table then leaveTable(member, memberSession) end
       memberSession.search = { ticketId = ticket.id, startedAt = now, playerCount = options.playerCount, tier = options.tier,
-        fullMatch = options.fullMatch, squadSize = #members }
+        fullMatch = options.fullMatch, ranked = options.ranked, squadSize = #members }
     end
   end
   if crossServer then
@@ -744,7 +765,7 @@ local function arriveForMatch(player, session, joinData, now)
     if not record then return false end
     nextTableId = nextTableId + 1
     tbl = { id = nextTableId, playerCount = record.playerCount, tier = record.tier, fullMatch = record.fullMatch,
-      private = false, members = {}, serial = 0, expected = record.seats, startAt = now + ARRIVAL_WAIT, matchId = joinData.matchId }
+      ranked = record.ranked, private = false, members = {}, serial = 0, expected = record.seats, startAt = now + ARRIVAL_WAIT, matchId = joinData.matchId }
     tables[tbl.id] = tbl
     matchTables[joinData.matchId] = tbl
   end
@@ -775,8 +796,11 @@ local function awardMatchCompletion(player, session, state)
   local advancingTeam = advancingRole and (advancingRole == 'attackers' and state.attackingTeam or (state.attackingTeam == 'A' and 'B' or 'A')) or (isAttacking and 'A' or 'B')
   local userWon = (advancingTeam == 'A')
 
+  -- Ranked plays for Rank Points only, so no coins move in either direction.
+  local noCoins = session.table ~= nil and session.table.ranked == true
+
   -- Captured-point coins are paid only on a win, at the round's final Chao Di stake.
-  local roundTrickCoins = userWon and (session.matchTrickCoins or 0) * (state.chaodiMultiplier or 1) or 0
+  local roundTrickCoins = userWon and not noCoins and (session.matchTrickCoins or 0) * (state.chaodiMultiplier or 1) or 0
   session.coins = session.coins + roundTrickCoins
 
   local defScore = (settlement and settlement.defenderScore) or ((state.points and (state.points[isAttacking and 2 or 1] or 0) or 0) + (state.penaltyPoints or 0))
@@ -826,7 +850,7 @@ local function awardMatchCompletion(player, session, state)
   -- by the hand result. Carrying more coins unlocks higher rooms; it does not
   -- create an arbitrary percentage bonus inside a room.
   local uncappedAmount = baseStake * totalMultiplier
-  local rawAmount = math.min(winLossCap, uncappedAmount)
+  local rawAmount = noCoins and 0 or math.min(winLossCap, uncappedAmount)
 
   local netAmount = 0
   local tax = 0
@@ -860,7 +884,7 @@ local function awardMatchCompletion(player, session, state)
         remaining = remaining - share
       end
     end
-    if session.coins < 1000 then
+    if session.coins < 1000 and not noCoins then
       relief = 2000
       session.coins = session.coins + relief
     end
@@ -906,6 +930,7 @@ local function awardMatchCompletion(player, session, state)
     settlement.matchBonus = matchBonus
     settlement.vipBonus = vipBonus
     settlement.trickCoins = roundTrickCoins
+    settlement.ranked = noCoins or nil
   end
 
   local msg
@@ -924,6 +949,7 @@ local function awardMatchCompletion(player, session, state)
     end
   end
   if roundTrickCoins > 0 then msg = msg .. ' · Points +' .. formatK(roundTrickCoins) end
+  if noCoins then msg = userWon and '🏆 Ranked win!' or 'Ranked loss.' end
   local gained = roundTrickCoins + math.max(0, netAmount) + vipBonus + matchBonus
 
   -- Lifetime stats (saved with progress).
@@ -932,29 +958,23 @@ local function awardMatchCompletion(player, session, state)
   bump('roundsPlayed')
   if stats.roundsPlayed == 1 then funnel(player, 3, 'First round finished') end
   logEvent(player, 'RoundPlayed_' .. tostring(state.tier or 'unknown'))
-  -- Ranked ladder. RP scales with how decisive the round was (the levels the
-  -- winning team took), so a shutout is worth far more than a squeaker:
-  --   against people   win +30 / +40 / +50    loss -25 / -30 / -35
-  --   against bots     win +15 / +20 / +25    loss -17 / -20 / -23
-  -- Bot tables move it about half as much and are slightly negative at an even
-  -- win rate, so the ladder measures wins against people, not bot grinding.
-  -- Points never drop below 0 and Bronze (under 100) never loses any.
-  do
-    local tbl, vsPeople = session.table, false
-    if tbl then
-      for seat in pairs(tbl.members) do
-        if Cards.team(seat) ~= Cards.team(session.seat) then vsPeople = true end
-      end
+  -- Ranked ladder: only rounds from the Ranked queue count, never private tables.
+  -- RP scales with how decisive the round was (its payout grade, 1-4); bot-only
+  -- games stop counting at Gold. See Scoring.rankDelta for the amounts.
+  local rankedTable = session.table
+  if rankedTable and rankedTable.ranked and not rankedTable.private then
+    local vsPeople = false
+    for seat in pairs(rankedTable.members) do
+      if Cards.team(seat) ~= Cards.team(session.seat) then vsPeople = true end
     end
-    local levels = math.clamp((settlement and settlement.outcome and settlement.outcome.levels) or 1, 1, 3)
     local before = stats.rankPoints or 0
-    local delta
-    if userWon then delta = vsPeople and (20 + 10 * levels) or (10 + 5 * levels)
-    elseif before < 100 then delta = 0
-    else delta = vsPeople and -(20 + 5 * levels) or -(14 + 3 * levels) end
+    local delta, botCapped = Scoring.rankDelta(before, userWon, vsPeople, gradeMultiplier, BOT_RANK_CAP)
     stats.rankPoints = math.max(0, before + delta)
     local change = stats.rankPoints - before
-    if settlement then settlement.rankDelta, settlement.rankPoints, settlement.rankTier = change, stats.rankPoints, rankName(stats.rankPoints) end
+    if settlement then
+      settlement.rankDelta, settlement.rankPoints, settlement.rankTier = change, stats.rankPoints, rankName(stats.rankPoints)
+      settlement.rankBotCapped = botCapped
+    end
     if change ~= 0 then
       msg = msg .. string.format(' · Rank %s%d (%s %d RP)', change > 0 and '+' or '', change, rankName(stats.rankPoints), stats.rankPoints)
     end
@@ -1029,7 +1049,8 @@ local function refreshDeadline(tbl, now)
   local waitingSeat = (game.phase == 'tricks' and game.turn) or (game.phase == 'kitty' and (game.kittyHolder or game.dealer)) or nil
   if not (waitingSeat and Practice.isHuman(game, waitingSeat)) then tbl.waitKey, tbl.turnDeadline = nil, nil return nil end
   local key = game.phase .. ':' .. waitingSeat .. ':' .. game.tricks .. ':' .. #game.trick
-  if tbl.waitKey ~= key then tbl.waitKey, tbl.turnDeadline = key, now + TURN_SECONDS[game.phase] end
+  local seconds = (tbl.away and tbl.away[waitingSeat]) and AWAY_SECONDS or TURN_SECONDS[game.phase]
+  if tbl.waitKey ~= key then tbl.waitKey, tbl.turnDeadline = key, now + seconds end
   return waitingSeat
 end
 
@@ -1132,7 +1153,16 @@ local function tableTick(tbl, now)
     elseif waitingSeat and now >= tbl.turnDeadline then
       local name = seatName(tbl, waitingSeat)
       if Practice.autoAct(game, waitingSeat, now) then
-        changed, message = true, name .. ' ran out of time, so a suggested move was played.'
+        tbl.timeouts, tbl.away = tbl.timeouts or {}, tbl.away or {}
+        tbl.timeouts[waitingSeat] = (tbl.timeouts[waitingSeat] or 0) + 1
+        if tbl.away[waitingSeat] then
+          changed = true
+        elseif tbl.timeouts[waitingSeat] >= 2 then
+          tbl.away[waitingSeat] = true
+          changed, message = true, name .. ' seems to be away, so their turns are played for them until they return.'
+        else
+          changed, message = true, name .. ' ran out of time, so a suggested move was played.'
+        end
       end
     end
     if game.phase == 'trick-review' then
@@ -1575,7 +1605,7 @@ remote.OnServerEvent:Connect(function(player, action, value, revision)
     local roll, index = random:NextInteger(1, 100), #prizes
     for i, w in ipairs(weights) do
       if roll <= w then index = i break end
-      roll -= w
+      roll = roll - w
     end
     local prize = prizes[index]
     session.luckyDay = today
@@ -1599,6 +1629,13 @@ remote.OnServerEvent:Connect(function(player, action, value, revision)
   end
   -- Table settings from a lobby request, checked against the player's coins.
   local function tableOptions(request)
+    -- Ranked: one round at any table size, with no coins at stake or required.
+    if type(request) == 'table' and request.ranked == true and (action == 'queue' or (session.table and session.table.ranked)) then
+      local count = request.playerCount
+      if count ~= 6 and count ~= 8 and count ~= 10 then count = 4 end
+      return { playerCount = count, tier = 'novice', fullMatch = false, ranked = true }, nil,
+        { min = 0, name = 'Ranked', base = TIER_CONFIG.novice.base }
+    end
     local playerCount = type(request) == 'table' and request.playerCount or (session.table and session.table.playerCount) or 4
     if playerCount ~= 4 and playerCount ~= 6 and playerCount ~= 8 and playerCount ~= 10 then return nil, 'Choose 4, 6, 8 or 10 players.' end
     local chosenTier = type(request) == 'table' and TIER_CONFIG[request.tier] and request.tier or (session.table and session.table.tier)
@@ -1613,7 +1650,18 @@ remote.OnServerEvent:Connect(function(player, action, value, revision)
     return { playerCount = playerCount, tier = chosenTier, fullMatch = fullMatch }, nil, cfg
   end
 
+  if action == 'lobby_refresh' then
+    if now - (session.lastLobbyRefresh or -math.huge) >= 4 then
+      session.lastLobbyRefresh = now
+      send(player, session)
+    end
+    return
+  end
   if action == 'queue' or action == 'create_private' then
+    -- Only a squad leader queues; say so before any coin check.
+    if action == 'queue' and session.squad and session.squad.leader ~= player then
+      send(player, session, 'Only the squad leader can start matchmaking.') return
+    end
     local options, problem, cfg = tableOptions(value)
     if not options then send(player, session, problem) return end
     leaveTable(player, session)
@@ -1656,7 +1704,7 @@ remote.OnServerEvent:Connect(function(player, action, value, revision)
   end
   if action == 'change_table' then
     local tbl = session.table
-    local options, problem, cfg = tableOptions({ playerCount = tbl and tbl.playerCount or 4, tier = tbl and tbl.tier or 'novice', fullMatch = tbl and tbl.fullMatch or false })
+    local options, problem, cfg = tableOptions({ ranked = tbl and tbl.ranked, playerCount = tbl and tbl.playerCount or 4, tier = tbl and tbl.tier or 'novice', fullMatch = tbl and tbl.fullMatch or false })
     leaveTable(player, session)
     if not options then send(player, session, problem) return end
     startSearch(player, session, options, cfg, now)
@@ -1800,7 +1848,7 @@ remote.OnServerEvent:Connect(function(player, action, value, revision)
         return
       end
     end
-    local _, problem = tableOptions({ playerCount = tbl.playerCount, tier = tbl.tier, fullMatch = tbl.fullMatch })
+    local _, problem = tableOptions({ ranked = tbl.ranked, playerCount = tbl.playerCount, tier = tbl.tier, fullMatch = tbl.fullMatch })
     if problem then send(player, session, problem) return end
     startGame(tbl, now)
     broadcast(tbl, player.DisplayName .. ' started a new match.')
@@ -1841,6 +1889,9 @@ remote.OnServerEvent:Connect(function(player, action, value, revision)
     else accepted, reason = Practice.bury(game, seat, value, now) end
     if not accepted then send(player, session, reason) return end
     tbl.waitKey = nil
+    -- Acting yourself clears any timeouts and brings you back from away.
+    if tbl.timeouts then tbl.timeouts[seat] = nil end
+    if tbl.away then tbl.away[seat] = nil end
     local message = reason
     if not isLive then message = Practice.bots(game) or reason end
     afterChange(tbl, nil, player, message)

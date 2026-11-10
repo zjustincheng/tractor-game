@@ -708,7 +708,7 @@ function arenaUI.initLuckyModal()
         idx = idx % #prizes + 1
         highlight(idx)
         playSound('click')
-        task.wait(0.05); waited += 0.05
+        task.wait(0.05); waited = waited + 0.05
         target = C.state and C.state.luckyResult
       end
       if target then

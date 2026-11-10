@@ -175,6 +175,10 @@ Policy evaluation tests cover promotion with a positive level interval and point
 
 `backend/src/training/roblox-burial.test.ts` covers Roblox-rules burial options, which start from the Roblox bot's burial and leave website burials unchanged, and checks that a Roblox-rules generation skips baseline and Sharp when its Roblox score cannot earn promotion. `roblox/tests/parity.mjs` checks that the in-game Luau burial in `roblox/src/server/TrainedBots.luau` picks the same cards.
 
+`roblox/tests/ranked.lua` covers Ranked point changes, including the Gold cap for bot-only games, and `roblox/tests/matchmaker.lua` covers its separate queue, longer wait, and rank-based matching that widens from one tier to two to anyone. The server wiring that marks a table as Ranked is not covered because `roblox/tests/server.lua` cannot run against the current server script.
+
+Update 2026-11-10: the Roblox suites run again under Fengari. `server.lua`, `tables.lua`, `crossserver.lua` and `matchserver.lua` stub purchase, badge and analytics services; loops close the Double window; `setup`, `practice`, `moves` and `multiplayer` pin the 8-second declaration window they were written for. `tables.lua` covers away players (two timeouts in a row give a 3-second timer until they act). `client.lua` loads every UI module and checks the home screen, Money/Rank toggle and Friends page, then stops at its first in-game check (declaration buttons hidden in the harness); the rest of its scenario predates the current UI and still needs updating.
+
 # Roblox foundation
 
 `roblox/tests/practice.lua` exercises the native pure Lua-compatible card and

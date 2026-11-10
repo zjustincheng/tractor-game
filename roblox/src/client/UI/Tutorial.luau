@@ -241,7 +241,7 @@ local pointerTarget, pointerGlow
 task.spawn(function()
   local t = 0
   while gui.Parent do
-    t += task.wait()
+    t = t + task.wait()
     if pointer.Visible and pointerTarget and pointerTarget.Parent then
       local onScreen = pointerTarget.AbsoluteSize.X > 0 and pointerTarget.Visible
       local p = pointerTarget

@@ -85,8 +85,8 @@ local function buildIllustratedThumbnail(card, modeIdx, titleText, badgeText, te
   -- Player-Count Badge (top-right pill)
   local pBadge = frame(thumb, 'PlayerCountBadge', Color3.fromRGB(12, 28, 18), 999)
   pBadge.BackgroundTransparency = 0.4
-  pBadge.Size = UDim2.fromOffset(86, 20)
-  pBadge.Position = UDim2.new(1, -90, 0, 5)
+  pBadge.Size = UDim2.fromOffset(54, 20)
+  pBadge.Position = UDim2.new(1, -58, 0, 5)
   outline(pBadge, palette.goldDark, 1)
 
   local dot = frame(pBadge, 'Dot', palette.green, 999)
@@ -286,11 +286,14 @@ if C.TweenService then
   end)
 end
 
+-- The left card is built below, after the mode buttons it controls.
+
 -- GAME MODES 2x2 GRID (1252.jpg Center-Right Cards)
 home.mode1 = frame(home.view, 'Mode1', palette.tileBg, 14)
 outline(home.mode1, palette.gold, 1.5)
 buildIllustratedThumbnail(home.mode1, 1, 'CLASSIC TRACTOR', '4 PLAYERS · 2 DECKS', '2 vs 2', color(240, 130, 30), color(160, 60, 15))
 local m1Btn = button(home.mode1, 'Action', 'PLAY ▶', function()
+  if arenaUI.queueRanked(4) then return end
   C.setupPlayerCount = 4
   C.lobbyMode = 'tier'
   if C.updateCoinDisplays then C.updateCoinDisplays() end
@@ -303,6 +306,7 @@ home.mode2 = frame(home.view, 'Mode2', palette.tileBg, 14)
 outline(home.mode2, palette.panelBorder, 1.5)
 buildIllustratedThumbnail(home.mode2, 2, '4-DECK EPIC', '8 PLAYERS · 4 DECKS', '4 vs 4', color(38, 135, 230), color(16, 60, 140))
 local m2Btn = button(home.mode2, 'Action', 'PLAY ▶', function()
+  if arenaUI.queueRanked(8) then return end
   C.setupPlayerCount = 8
   C.lobbyMode = 'tier'
   if C.updateCoinDisplays then C.updateCoinDisplays() end
@@ -315,6 +319,7 @@ home.mode3 = frame(home.view, 'Mode3', palette.tileBg, 14)
 outline(home.mode3, palette.panelBorder, 1.5)
 buildIllustratedThumbnail(home.mode3, 3, '5-DECK MEGA', '10 PLAYERS · 5 DECKS', '5 vs 5', color(155, 48, 215), color(80, 18, 125))
 local m3Btn = button(home.mode3, 'Action', 'PLAY ▶', function()
+  if arenaUI.queueRanked(10) then return end
   C.setupPlayerCount = 10
   C.lobbyMode = 'tier'
   if C.updateCoinDisplays then C.updateCoinDisplays() end
@@ -327,6 +332,7 @@ home.mode4 = frame(home.view, 'Mode4', palette.tileBg, 14)
 outline(home.mode4, palette.panelBorder, 1.5)
 buildIllustratedThumbnail(home.mode4, 4, '3-DECK TEAM', '6 PLAYERS · 3 DECKS', '3 vs 3', color(28, 155, 125), color(12, 75, 60))
 local m4Btn = button(home.mode4, 'Action', 'PLAY ▶', function()
+  if arenaUI.queueRanked(6) then return end
   C.setupPlayerCount = 6
   C.lobbyMode = 'tier'
   if C.updateCoinDisplays then C.updateCoinDisplays() end
@@ -334,6 +340,166 @@ local m4Btn = button(home.mode4, 'Action', 'PLAY ▶', function()
   C.render()
 end, palette.gold)
 m4Btn.TextSize = 13
+
+-- Left card: play for money or rank, public lobbies, and the Friends page.
+home.heroBtn.Visible = false
+home.modeButtons = { m1Btn, m2Btn, m3Btn, m4Btn }
+C.playFor = 'money'
+function arenaUI.queueRanked(playerCount)
+  if C.playFor ~= 'rank' then return false end
+  remote:FireServer('queue', { ranked = true, playerCount = playerCount })
+  return true
+end
+function arenaUI.updatePlayFor()
+  local rank = C.playFor == 'rank'
+  -- Selected sides use their own colour so the icons stay readable.
+  home.moneyToggle.BackgroundColor3 = rank and palette.panelLight or color(40, 150, 84)
+  home.moneyToggle.TextColor3 = rank and palette.cream or palette.white
+  home.rankToggle.BackgroundColor3 = rank and color(196, 48, 72) or palette.panelLight
+  home.rankToggle.TextColor3 = rank and palette.white or palette.cream
+  arenaUI.renderRankCard(rank)
+  arenaUI.placeLobbyList(rank)
+  for _, modeBtn in ipairs(home.modeButtons) do
+    modeBtn.Text = rank and 'PLAY RANKED ▶' or 'PLAY ▶'
+  end
+end
+local function setPlayFor(mode)
+  C.playFor = mode
+  arenaUI.updatePlayFor()
+end
+home.moneyToggle = button(home.heroCard, 'MoneyToggle', '💰 MONEY', function() setPlayFor('money') end, palette.panelLight)
+home.rankToggle = button(home.heroCard, 'RankToggle', '🏆 RANK', function() setPlayFor('rank') end, palette.panelLight)
+home.moneyToggle.Font, home.rankToggle.Font = Enum.Font.FredokaOne, Enum.Font.FredokaOne
+home.moneyToggle.TextSize, home.rankToggle.TextSize = 15, 15
+-- Your standing, shown only while playing for rank.
+home.rankCard = frame(home.heroCard, 'RankCard', palette.white, 12)
+gradient(home.rankCard, color(205, 127, 50), color(92, 52, 22), 90)
+outline(home.rankCard, palette.gold, 1.5)
+home.rankMedal = frame(home.rankCard, 'Medal', color(255, 240, 200), 999)
+outline(home.rankMedal, palette.white, 2)
+home.rankStar = label(home.rankMedal, 'Star', '★', 32, color(120, 70, 25))
+home.rankStar.Size = UDim2.fromScale(1, 1)
+home.rankName = label(home.rankCard, 'TierName', 'BRONZE', 28, palette.white)
+home.rankName.Font = Enum.Font.FredokaOne
+home.rankName.TextXAlignment = Enum.TextXAlignment.Left
+home.rankName.TextStrokeTransparency = 0.2
+home.rankName.TextStrokeColor3 = palette.darkStroke
+home.rankProgress = label(home.rankCard, 'Progress', '', 12, palette.white)
+home.rankProgress.Font = Enum.Font.GothamBold
+home.rankProgress.TextXAlignment = Enum.TextXAlignment.Left
+home.rankBar = frame(home.rankCard, 'Bar', color(20, 16, 30), 999)
+home.rankBar.BackgroundTransparency = 0.35
+home.rankFill = frame(home.rankBar, 'Fill', palette.goldBright, 999)
+
+local RANK_COLORS = {
+  Bronze = { color(205, 127, 50), color(92, 52, 22), color(120, 70, 25) },
+  Silver = { color(176, 188, 208), color(78, 90, 114), color(70, 84, 110) },
+  Gold = { color(245, 190, 50), color(150, 92, 12), color(150, 100, 10) },
+  Platinum = { color(70, 205, 195), color(16, 96, 108), color(14, 110, 115) },
+  Diamond = { color(90, 165, 255), color(30, 56, 170), color(30, 70, 190) },
+  Master = { color(214, 80, 235), color(92, 20, 130), color(120, 30, 160) },
+}
+function arenaUI.renderRankCard(show)
+  home.rankCard.Visible = show
+  if not show then return end
+  local points = C.state and C.state.rankPoints or 0
+  local current, nextTier = { name = 'Bronze', at = 0 }, nil
+  for _, tier in ipairs(C.Catalog.ranks or {}) do
+    if points >= tier.at then current = tier elseif not nextTier then nextTier = tier end
+  end
+  local colors = RANK_COLORS[current.name] or RANK_COLORS.Bronze
+  home.rankCard.Gradient.Color = ColorSequence.new(colors[1], colors[2])
+  home.rankStar.TextColor3 = colors[3]
+  home.rankName.Text = string.upper(current.name)
+  home.rankProgress.Text = nextTier and (points .. ' / ' .. nextTier.at .. ' RP') or (points .. ' RP · TOP TIER')
+  local share = nextTier and (points - current.at) / (nextTier.at - current.at) or 1
+  home.rankFill.Size = UDim2.fromScale(math.clamp(share, 0.03, 1), 1)
+end
+home.lobbyHeading = label(home.heroCard, 'LobbyHeading', 'PUBLIC LOBBIES', 13, palette.goldBright)
+home.lobbyHeading.Font = Enum.Font.FredokaOne
+home.lobbyList = make('ScrollingFrame', home.heroCard, 'LobbyList', { BackgroundColor3 = palette.emeraldDark, BackgroundTransparency = 0.35,
+  BorderSizePixel = 0, ScrollBarThickness = 4, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.None })
+corner(home.lobbyList, 10)
+home.lobbyEmpty = label(home.lobbyList, 'Empty', 'No public lobbies right now.', 11, palette.muted)
+home.lobbyEmpty.TextWrapped = true
+home.lobbyInvite = button(home.lobbyList, 'InviteCta', '👥 INVITE FRIENDS', function() arenaUI.openInvites() end, palette.panelLight)
+home.lobbyInvite.TextSize = 12
+home.friendsBtn = button(home.heroCard, 'FriendsBtn', '👥 FRIENDS', function()
+  C.lobbyMode = 'friends'
+  C.updateAction()
+  C.render()
+end, palette.panelLight)
+home.friendsBtn.TextSize = 13
+
+function arenaUI.placeLobbyList(rank)
+  local w, h = home.heroW, home.heroH
+  if not w then return end
+  local top = rank and 142 or 50
+  rect(home.lobbyHeading, 8, top, w - 16, 18)
+  rect(home.lobbyList, 8, top + 22, w - 16, h - (top + 22) - 48)
+  rect(home.lobbyEmpty, 8, 8, w - 36, 34)
+  rect(home.lobbyInvite, math.floor((w - 16 - 170) / 2), 46, 170, 30)
+  arenaUI.renderPublicLobbies()
+end
+
+function arenaUI.layoutHeroCard(w, h)
+  home.heroW, home.heroH = w, h
+  local half = math.floor((w - 16 - 6) / 2)
+  rect(home.moneyToggle, 8, 8, half, 34)
+  rect(home.rankToggle, 8 + half + 6, 8, w - 16 - 6 - half, 34)
+  local cardW = w - 16
+  rect(home.rankCard, 8, 48, cardW, 86)
+  rect(home.rankMedal, 12, 15, 56, 56)
+  rect(home.rankName, 78, 8, cardW - 86, 36)
+  rect(home.rankProgress, 78, 44, cardW - 86, 16)
+  rect(home.rankBar, 78, 63, cardW - 92, 10)
+  rect(home.friendsBtn, 8, h - 40, w - 16, 32)
+  arenaUI.placeLobbyList(C.playFor == 'rank')
+end
+
+-- Public squads in this server with room; JOIN puts you in theirs.
+function arenaUI.renderPublicLobbies()
+  for _, child in ipairs(home.lobbyList:GetChildren()) do
+    if string.sub(child.Name, 1, 6) == 'Lobby_' then child:Destroy() end
+  end
+  local lobbies = C.state and C.state.openSquads or {}
+  home.lobbyEmpty.Visible = #lobbies == 0
+  home.lobbyInvite.Visible = #lobbies == 0
+  local rowW = home.lobbyList.Size.X.Offset - 10
+  for index, lobby in ipairs(lobbies) do
+    local row = frame(home.lobbyList, 'Lobby_' .. index, palette.panel, 8)
+    rect(row, 3, 3 + (index - 1) * 38, rowW, 34)
+    local avatar = make('ImageLabel', row, 'Avatar', { BackgroundColor3 = palette.panelLight, BorderSizePixel = 0,
+      Image = 'rbxthumb://type=AvatarHeadShot&id=' .. tostring(lobby.leaderId) .. '&w=150&h=150' })
+    corner(avatar, 999)
+    rect(avatar, 4, 4, 26, 26)
+    local name = label(row, 'Name', lobby.leaderName .. '  ' .. lobby.size .. '/5', 11, palette.cream)
+    name.Font = Enum.Font.GothamBold
+    name.TextXAlignment = Enum.TextXAlignment.Left
+    name.TextTruncate = Enum.TextTruncate.AtEnd
+    name.TextWrapped = false
+    rect(name, 36, 0, rowW - 36 - 58, 34)
+    if lobby.playing then
+      local playing = label(row, 'Playing', 'PLAYING', 9, palette.muted)
+      rect(playing, rowW - 56, 0, 52, 34)
+    else
+      local join = button(row, 'Join', 'JOIN', function() remote:FireServer('squad_join', lobby.leaderId) end)
+      join.TextSize = 11
+      rect(join, rowW - 54, 5, 50, 24)
+    end
+  end
+  home.lobbyList.CanvasSize = UDim2.fromOffset(0, 6 + #lobbies * 38)
+end
+arenaUI.updatePlayFor()
+
+-- The list only reaches a client when the server sends state, so ask while it is showing.
+task.spawn(function()
+  while home.view and home.view.Parent do
+    task.wait(6)
+    local state = C.state
+    if home.view.Visible and state and not state.search and not state.table then remote:FireServer('lobby_refresh') end
+  end
+end)
 
 local modeDescriptions = {
   { home.mode1, 'The classic partnership game. A great place to start.' },
@@ -441,7 +607,9 @@ function arenaUI.renderSquad()
   home.squadFill.Text = squad.public ~= false and '🌐 PUBLIC' or '🔒 PRIVATE'
   home.squadFill.TextColor3 = squad.public ~= false and palette.goldBright or palette.cream
   home.squadLeave.Visible = not squad.solo
-  home.heroBtn.Text = squad.isLeader and 'PLAY ▶' or 'LEADER PICKS MODE'
+  home.heroBtn.Text = squad.isLeader and 'QUICK MATCH ▶' or 'LEADER PICKS MODE'
+  home.friendsBtn.Text = #squad.members > 1 and ('👥 FRIENDS · SQUAD ' .. #squad.members .. '/5') or '👥 FRIENDS'
+  arenaUI.renderPublicLobbies()
   for _, child in ipairs(home.squadMembers:GetChildren()) do
     if string.sub(child.Name, 1, 7) == 'Member_' then child:Destroy() end
   end
@@ -691,9 +859,10 @@ arenaUI.searchCancel.Size = UDim2.fromOffset(80, 28)
 function arenaUI.renderSearch()
   local search = C.state and C.state.search
   arenaUI.searchBar.Visible = search ~= nil
+  arenaUI.updatePlayFor()
   if not search then return end
   local elapsed = math.max(0, math.floor((C.state.serverTime or 0) + os.clock() - C.receivedAt - (search.startedAt or 0)))
-  local tierName = string.upper(search.tier or 'novice')
+  local tierName = search.ranked and 'RANKED' or string.upper(search.tier or 'novice')
   if arenaUI.compactSearch then
     arenaUI.searchText.Text = string.format('🔍 %d:%02d · %dP %s', math.floor(elapsed / 60), elapsed % 60, search.playerCount or 4, tierName)
       .. ((search.squadSize or 1) > 1 and (' · SQUAD ' .. search.squadSize) or '')
@@ -1027,4 +1196,85 @@ tier.bottomTip.TextXAlignment = Enum.TextXAlignment.Left
 
 end
 arenaUI.initTierScreen()
+
+-- Friends page: your squad and private tables, away from the main menu.
+local friends = {} C.friends = friends
+friends.view = frame(root, 'FriendsScreen', palette.emeraldDeep, 20)
+friends.view.BackgroundTransparency = 0.05
+friends.view.ZIndex = 25
+friends.view.Visible = false
+outline(friends.view, palette.railOuter, 1.8)
+friends.header = frame(friends.view, 'Header', palette.panel, 14)
+friends.header.BackgroundTransparency = 0.4
+outline(friends.header, palette.panelBorder, 1)
+friends.backBtn = button(friends.header, 'BackBtn', '⬅ LOBBY', function()
+  C.lobbyMode = 'home'
+  C.updateAction()
+  C.render()
+end, palette.panelLight)
+friends.backBtn.TextSize = 12
+friends.title = label(friends.header, 'Title', 'PLAY WITH FRIENDS', 18, palette.goldBright)
+friends.title.Font = Enum.Font.FredokaOne
+
+friends.squad = frame(friends.view, 'SquadPanel', palette.panel, 14)
+friends.squad.BackgroundTransparency = 0.25
+outline(friends.squad, palette.gold, 1.5)
+for _, widget in ipairs({ home.heroTag, home.heroTitle, home.squadMembers, home.squadInvite, home.squadFill, home.squadLeave }) do
+  widget.Parent = friends.squad
+end
+
+friends.private = frame(friends.view, 'PrivatePanel', palette.panel, 14)
+friends.private.BackgroundTransparency = 0.25
+outline(friends.private, palette.gold, 1.5)
+friends.privateTitle = label(friends.private, 'Title', 'PRIVATE TABLE', 16, palette.goldBright)
+friends.privateTitle.Font = Enum.Font.FredokaOne
+friends.privateDesc = label(friends.private, 'Desc', "Create a table and share its code, or enter a friend's code to join.", 12, palette.cream)
+friends.privateDesc.TextWrapped = true
+for _, widget in ipairs({ tier.createPrivate, tier.codeBox, tier.joinCode }) do
+  widget.Parent = friends.private
+end
+friends.privateHelp = label(friends.private, 'Help', 'HOW IT WORKS\n\n1.  Create a table and pick its size.\n\n2.  Share the 4-letter code with friends.\n\n3.  The host presses Start. Bots take any empty seats.\n\nPrivate tables never change your rank.', 12, palette.cream)
+friends.privateHelp.TextWrapped = true
+friends.privateHelp.TextXAlignment = Enum.TextXAlignment.Left
+friends.privateHelp.TextYAlignment = Enum.TextYAlignment.Top
+tier.privatePicker.Parent = friends.view
+
+function arenaUI.layoutFriends(w, h, narrow)
+  rect(friends.header, 12, 10, w - 24, 46)
+  rect(friends.backBtn, 10, 7, 86, 32)
+  rect(friends.title, 106, 12, w - 24 - 212, 22)
+  local top, gap, panelH = 66, 10, h - 66 - 12
+  local squadW, squadH, privateX, privateY, privateW, privateH
+  if narrow then
+    privateH = 176
+    squadW, squadH = w - 24, panelH - gap - privateH
+    privateX, privateY, privateW = 12, top + squadH + gap, w - 24
+  else
+    privateW = math.floor((w - 24 - gap) * 0.4)
+    squadW, squadH = w - 24 - gap - privateW, panelH
+    privateX, privateY, privateH = 12 + squadW + gap, top, panelH
+  end
+  rect(friends.squad, 12, top, squadW, squadH)
+  rect(friends.private, privateX, privateY, privateW, privateH)
+
+  rect(home.heroTag, 8, 8, squadW - 16, 20)
+  rect(home.heroTitle, 8, 32, squadW - 16, 22)
+  local membersH = math.max(60, squadH - 60 - 46)
+  arenaUI.squadLayout = { narrow = false, rowH = safeClamp(math.floor((membersH - 8) / 5), 20, 34) }
+  rect(home.squadMembers, 8, 60, squadW - 16, membersH)
+  local chipW = math.floor((squadW - 32) / 3)
+  local chipY = 60 + membersH + 8
+  rect(home.squadInvite, 8, chipY, chipW, 30)
+  rect(home.squadFill, 16 + chipW, chipY, chipW, 30)
+  rect(home.squadLeave, 24 + chipW * 2, chipY, chipW, 30)
+
+  rect(friends.privateTitle, 12, 10, privateW - 24, 22)
+  rect(friends.privateDesc, 12, 34, privateW - 24, 36)
+  rect(tier.createPrivate, 12, 78, privateW - 24, 34)
+  rect(tier.codeBox, 12, 122, privateW - 24 - 82, 34)
+  rect(tier.joinCode, privateW - 12 - 74, 122, 74, 34)
+  friends.privateHelp.Visible = privateH >= 300
+  rect(friends.privateHelp, 16, 176, privateW - 32, privateH - 186)
+  rect(tier.privatePicker, math.max(12, (w - 300) / 2), privateY + 118 - 80, 300, 72)
+end
 end

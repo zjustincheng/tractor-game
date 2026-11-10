@@ -121,6 +121,7 @@ C.render = function()
   local aIsAttacking = current.attackingTeam == 'A'
   local stake = current.chaodiMultiplier or 1
   arenaUI.stakeVal.Text = '×' .. stake
+  arenaUI.stakePill.Visible = not arenaUI.stakeInTitle and not current.ranked
   arenaUI.stakeVal.TextColor3 = stake > 1 and palette.goldBright or palette.white
   arenaUI.stakeOutline.Color = stake > 1 and palette.gold or palette.panelBorder
   arenaUI.stakeOutline.Thickness = stake > 1 and 2 or 1
@@ -133,7 +134,7 @@ C.render = function()
   meterVal.Text = scoreFraction
   if arenaUI.goalVal then arenaUI.goalVal.Text = scoreFraction end
   if arenaUI.goalTitle then
-    if arenaUI.stakeInTitle and stake > 1 then
+    if arenaUI.stakeInTitle and stake > 1 and not current.ranked then
       arenaUI.goalTitle.Text = (aIsAttacking and 'OPP PTS' or 'OUR PTS') .. ' · STAKE ×' .. stake
     else
       arenaUI.goalTitle.Text = aIsAttacking and 'OPPONENT POINTS' or 'YOUR TEAM POINTS'
@@ -279,9 +280,17 @@ C.render = function()
     if result.rankPoints then
       local change = result.rankDelta or 0
       local sign = change > 0 and '+' or (change < 0 and '−' or '±')
+      -- Ranked plays for points only: no coin figures on this screen.
+      if result.ranked then
+        settleUI.coinTotal.Text = sign .. math.abs(change) .. ' RP'
+        settleUI.coinTotal.TextColor3 = change < 0 and color(255, 120, 120) or palette.goldBright
+        settleUI.coinSub.Text = result.gradeName and (tostring(result.gradeName) .. '\n') or ''
+      end
       local sub = settleUI.coinSub.Text
-      settleUI.coinSub.Text = sub .. (sub:sub(-1) == '\n' and '' or '   ·   ')
-        .. 'Rank ' .. sign .. math.abs(change) .. ' (' .. tostring(result.rankTier or 'Bronze') .. ' ' .. result.rankPoints .. ' RP)'
+      settleUI.coinSub.Text = sub .. ((sub == '' or sub:sub(-1) == '\n') and '' or '   ·   ')
+        .. (result.rankBotCapped and 'Rank unchanged: bots stop counting at Gold'
+          or (result.ranked and (string.upper(tostring(result.rankTier or 'Bronze')) .. ' · ' .. result.rankPoints .. ' RP')
+            or ('Rank ' .. sign .. math.abs(change) .. ' (' .. tostring(result.rankTier or 'Bronze') .. ' ' .. result.rankPoints .. ' RP)')))
     end
   end
 

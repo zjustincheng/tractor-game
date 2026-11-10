@@ -183,6 +183,18 @@ local function layoutPolish()
           for i = 1, mode.fan do
             local face = C.cardFace(mode.art, FAN_CARDS[i], 'FanCard' .. i, cw, ch)
             face.AnchorPoint = Vector2.new(0.5, 1)
+            -- At this size the upside-down corner and the big centre rank of the
+            -- cards underneath read as stray letters; keep only what shows cleanly.
+            for _, part in ipairs({ 'SubRank', 'SubCorner' }) do
+              local hidden = face:FindFirstChild(part, true)
+              if hidden then hidden.Visible = false end
+            end
+            if i < mode.fan then
+              for _, part in ipairs({ 'Letter', 'Suit', 'CourtPanel' }) do
+                local hidden = face:FindFirstChild(part)
+                if hidden then hidden.Visible = false end
+              end
+            end
             table.insert(mode.fanCards, face)
           end
           mode.fanSize = ch

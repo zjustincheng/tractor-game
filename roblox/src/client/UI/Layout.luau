@@ -18,10 +18,17 @@ C.updateAction = function()
   local current = C.state and C.state.game
   local count = #selectedList()
   local isHome = current == nil or current.done
+  -- In play the hint starts empty; the branches below fill it when they have
+  -- something to say, so lobby text never lingers at the table.
+  if current and not current.done then handHint.Text = '' end
 
   home.view.Visible = isHome and C.lobbyMode == 'home' and not (current and current.done)
   tier.view.Visible = isHome and C.lobbyMode == 'tier' and not (current and current.done)
-  arenaUI.lobbyBackdrop.Visible = home.view.Visible or tier.view.Visible
+  -- Sitting down at a table (a private one included) leaves the Friends page.
+  if C.lobbyMode == 'friends' and C.state and C.state.table then C.lobbyMode = 'home' end
+  C.friends.view.Visible = isHome and C.lobbyMode == 'friends' and not (current and current.done)
+  home.view.Visible = isHome and C.lobbyMode == 'home' and not (current and current.done)
+  arenaUI.lobbyBackdrop.Visible = home.view.Visible or tier.view.Visible or C.friends.view.Visible
   settleUI.modal.Visible = current ~= nil and current.done == true
   arenaUI.settleShade.Visible = settleUI.modal.Visible
   actionBar.Visible = not settleUI.modal.Visible
@@ -281,7 +288,9 @@ C.resize = function()
   -- Short screens put header buttons over this corner, and compact panels
   -- leave no room; the points title carries the stake there instead.
   arenaUI.stakeInTitle = l.short or stakeW < 30
-  arenaUI.stakePill.Visible = not arenaUI.stakeInTitle
+  -- Ranked has no coin stake to show.
+  local ranked = C.state and C.state.game and C.state.game.ranked
+  arenaUI.stakePill.Visible = not arenaUI.stakeInTitle and not ranked
   rect(arenaUI.stakeTag, 0, 3, stakeW, 10)
   rect(arenaUI.stakeVal, 0, 14, stakeW, boxH - 16)
 
@@ -374,6 +383,8 @@ C.resize = function()
 
   rect(home.view, lobbyX, lobbyY, lobbyW, lobbyH)
   rect(tier.view, lobbyX, lobbyY, lobbyW, lobbyH)
+  rect(C.friends.view, lobbyX, lobbyY, lobbyW, lobbyH)
+  arenaUI.layoutFriends(lobbyW, lobbyH, narrowLobby)
 
   for _, object in ipairs({ home.dragonFrame, home.heroDesc, tier.rulesBtn }) do
     object.Visible = not narrowLobby
@@ -398,24 +409,17 @@ C.resize = function()
     rect(home.mailBtn, innerW - 110, 7, 32, 32)
     rect(home.rulesBtn, innerW - 74, 7, 32, 32)
     rect(home.settingsBtn, innerW - 38, 7, 32, 32)
-    local heroH = 200
+    local heroH = 300
     rect(home.heroCard, 12, 64, innerW, heroH)
-    rect(home.heroTag, 8, 8, innerW - 16, 20)
-    rect(home.heroTitle, 8, 30, innerW - 16, 20)
-    arenaUI.squadLayout = { narrow = true, rowH = 54 }
-    rect(home.squadMembers, 8, 54, innerW - 16, 60)
-    local chipW = math.floor((innerW - 16 - 16) / 3)
-    rect(home.squadInvite, 8, 120, chipW, 28)
-    rect(home.squadFill, 16 + chipW, 120, chipW, 28)
-    rect(home.squadLeave, 24 + chipW * 2, 120, chipW, 28)
-    rect(home.heroBtn, 12, heroH - 46, innerW - 24, 36)
+    arenaUI.layoutHeroCard(innerW, heroH)
     local gridY = 64 + heroH + 10
     local modeW = math.floor((innerW - 10) / 2)
-    local modeH = math.floor((lobbyH - 94 - 10 - gridY - 10) / 2)
+    local modeH = math.floor((lobbyH - 54 - 10 - gridY - 10) / 2)
     rect(home.mode1, 12, gridY, modeW, modeH)
-    rect(home.mode2, 12 + modeW + 10, gridY, modeW, modeH)
-    rect(home.mode3, 12, gridY + modeH + 10, modeW, modeH)
-    rect(home.mode4, 12 + modeW + 10, gridY + modeH + 10, modeW, modeH)
+    -- Smallest table first: 2v2, 3v3 on top, then 4v4, 5v5.
+    rect(home.mode4, 12 + modeW + 10, gridY, modeW, modeH)
+    rect(home.mode2, 12, gridY + modeH + 10, modeW, modeH)
+    rect(home.mode3, 12 + modeW + 10, gridY + modeH + 10, modeW, modeH)
     for _, card in ipairs({ home.mode1, home.mode2, home.mode3, home.mode4 }) do
       local thumbH = math.floor(modeH * 0.58)
       local thumb, badge, btn = card:FindFirstChild('Thumb'), card:FindFirstChild('Badge'), card:FindFirstChild('Action')
@@ -429,20 +433,13 @@ C.resize = function()
       if btn then rect(btn, 8, modeH - 32, modeW - 16, 26) end
     end
     for _, pill in ipairs(home.sidePills) do pill.Visible = false end
-    rect(home.bottomBar, 12, lobbyH - 94, innerW, 86)
+    rect(home.bottomBar, 12, lobbyH - 54, innerW, 46)
     home.emoteBtn.Visible = false
-    local privateW = math.floor((innerW - 16 - 16) * 0.42)
-    local joinW = 64
-    local boxW = innerW - 16 - 16 - privateW - joinW
-    rect(tier.createPrivate, 8, 7, privateW, 32)
-    rect(tier.codeBox, 8 + privateW + 8, 7, boxW, 32)
-    rect(tier.joinCode, 8 + privateW + 8 + boxW + 8, 7, joinW, 32)
-    rect(tier.privatePicker, math.max(12, (lobbyW - 300) / 2), lobbyH - 94 - 80, 300, 72)
     local navW = math.floor((innerW - 16 - 4 * 4) / 5)
     for index, navButton in ipairs({ home.shopBtn, home.historyBtn, home.rewardsBtn, home.luckyBtn, home.vaultBtn }) do
       navButton.Visible = true
       navButton.TextSize = 10
-      rect(navButton, 8 + (navW + 4) * (index - 1), 47, navW, 32)
+      rect(navButton, 8 + (navW + 4) * (index - 1), 7, navW, 32)
     end
 
     -- Tier: two-row header, count tabs in a row, stacked table cards.
@@ -512,24 +509,8 @@ C.resize = function()
   local centerH = lobbyH - 128
   local heroW = safeClamp(math.floor(lobbyW * 0.30), 160, 260)
   rect(home.heroCard, 12, 64, heroW, centerH)
-  rect(home.heroTag, 8, 8, heroW - 16, 20)
-  rect(home.dragonFrame, 8, 32, heroW - 16, 68)
-  if home.dragonAura then
-    home.dragonAura.Position = UDim2.new(0.5, -30, 0, 4)
-  end
-  rect(home.heroTitle, 8, 102, heroW - 16, 22)
-  rect(home.heroDesc, 10, 120, heroW - 20, centerH - 170)
-  rect(home.heroBtn, 12, centerH - 42, heroW - 24, 34)
-  -- Squad panel inside the featured card.
   home.dragonFrame.Visible, home.heroDesc.Visible = false, false
-  rect(home.heroTitle, 8, 34, heroW - 16, 22)
-  local squadTop, squadBottom = 62, centerH - 42 - 8 - 66
-  arenaUI.squadLayout = { narrow = false, rowH = safeClamp(math.floor((squadBottom - squadTop - 8) / 5), 20, 34) }
-  rect(home.squadMembers, 8, squadTop, heroW - 16, squadBottom - squadTop)
-  rect(home.squadInvite, 8, squadBottom + 6, heroW - 16, 28)
-  local halfW = math.floor((heroW - 24) / 2)
-  rect(home.squadFill, 8, squadBottom + 38, halfW, 26)
-  rect(home.squadLeave, 16 + halfW, squadBottom + 38, halfW, 26)
+  arenaUI.layoutHeroCard(heroW, centerH)
 
   local hasSideCol = false
   local sideColW = hasSideCol and 110 or 0
@@ -539,9 +520,10 @@ C.resize = function()
   local cardH = math.floor((centerH - 10) / 2)
 
   rect(home.mode1, gridX, 64, cardW, cardH)
-  rect(home.mode2, gridX + cardW + 10, 64, cardW, cardH)
-  rect(home.mode3, gridX, 64 + cardH + 10, cardW, cardH)
-  rect(home.mode4, gridX + cardW + 10, 64 + cardH + 10, cardW, cardH)
+  -- Smallest table first: 2v2, 3v3 on top, then 4v4, 5v5.
+  rect(home.mode4, gridX + cardW + 10, 64, cardW, cardH)
+  rect(home.mode2, gridX, 64 + cardH + 10, cardW, cardH)
+  rect(home.mode3, gridX + cardW + 10, 64 + cardH + 10, cardW, cardH)
 
   local function layoutModeCard(card)
     local thumb = card:FindFirstChild('Thumb')
@@ -576,11 +558,7 @@ C.resize = function()
 
   rect(home.bottomBar, 12, lobbyH - 54, lobbyW - 24, 46)
   local homeBarW = lobbyW - 24
-  rect(tier.createPrivate, homeBarW - 330, 7, 150, 32)
-  rect(tier.codeBox, homeBarW - 172, 7, 90, 32)
-  rect(tier.joinCode, homeBarW - 74, 7, 66, 32)
-  rect(tier.privatePicker, 12 + homeBarW - 330 - 75, lobbyH - 54 - 80, 300, 72)
-  local bBtnW = math.floor((homeBarW - 16 - 340 - 4 * 8) / 5)
+  local bBtnW = math.floor((homeBarW - 16 - 4 * 8) / 5)
   home.emoteBtn.Visible = false
   for index, navButton in ipairs({ home.shopBtn, home.historyBtn, home.rewardsBtn, home.luckyBtn, home.vaultBtn }) do
     navButton.TextSize = 12

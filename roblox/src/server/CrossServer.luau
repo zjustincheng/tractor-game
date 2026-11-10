@@ -80,7 +80,7 @@ return function(Matchmaker, deps)
         local seats = {}
         for seat, userId in pairs(match.seats) do seats[tostring(seat)] = userId end
         local record = { matchId = matchId, accessCode = accessCode, playerCount = match.playerCount, tier = match.tier,
-          fullMatch = match.fullMatch, seats = seats }
+          fullMatch = match.fullMatch, ranked = match.ranked, seats = seats }
         if try(function() matchMap:SetAsync(matchId, record, MATCH_TTL) end) then
           for _, ticket in ipairs(match.tickets) do queueMap:RemoveAsync(ticket.id) end
           try(function() messaging:PublishAsync('TractorMatch', record) end)
