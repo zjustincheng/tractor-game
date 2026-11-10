@@ -21,9 +21,9 @@ return {
 
   -- productId / gamePassId: paste the IDs from Creator Hub (Monetization).
   -- 0 means not on sale yet; the shop says so instead of prompting.
-  { id = 'product_coins_10k', label = '10K Coins', price = 0, category = 'product', robux = 15, coins = 10000, productId = 3729878183, image = 'rbxassetid://84997199523345', desc = 'Starter bag of coins' },
-  { id = 'product_coins_50k', label = '55K Coins (+10%)', price = 0, category = 'product', robux = 50, coins = 55000, productId = 3729878307, image = 'rbxassetid://83669766952611', desc = 'Great value coin sack' },
-  { id = 'product_coins_200k', label = '250K Coins (+25%)', price = 0, category = 'product', robux = 149, coins = 250000, productId = 3729878374, image = 'rbxassetid://75326390158213', desc = 'High roller treasure chest' },
+  { id = 'product_coins_10k', label = '50K Coins', price = 0, category = 'product', robux = 39, coins = 50000, productId = 3729878183, image = 'rbxassetid://84997199523345', desc = 'Starter bag of coins' },
+  { id = 'product_coins_50k', label = '250K Coins (+30%)', price = 0, category = 'product', robux = 149, coins = 250000, productId = 3729878307, image = 'rbxassetid://83669766952611', desc = 'Great value coin sack' },
+  { id = 'product_coins_200k', label = '1.2M Coins (+88%)', price = 0, category = 'product', robux = 499, coins = 1200000, productId = 3729878374, image = 'rbxassetid://75326390158213', desc = 'Whale Room treasure chest' },
   { id = 'gamepass_vip', label = 'VIP Tractor Pass', price = 0, category = 'product', robux = 199, gamePassId = 2075164460, image = 'rbxassetid://137651052301606', desc = 'Permanent 2x coins plus gamble and suit markers' },
 
   -- Profile cosmetics (avatar frames, titles, banners). Kept out of the list
@@ -70,12 +70,32 @@ return {
   },
 
   -- Coins for each day of the 7-day login streak.
-  loginStreak = { 5000, 6000, 8000, 10000, 12000, 15000, 100000 },
+  -- (Trimmed so free coins don't undercut the Robux packs: ~63K per week.)
+  loginStreak = { 3000, 4000, 5000, 6000, 7000, 8000, 30000 },
+
+  -- Ranked ladder: Rank Points (RP) needed to reach each tier. A win earns RP
+  -- and a loss costs some (more against people than against bots); Bronze
+  -- players never lose RP. The amounts are in the server's settlement code.
+  ranks = {
+    { name = 'Bronze', at = 0 }, { name = 'Silver', at = 100 }, { name = 'Gold', at = 250 },
+    { name = 'Platinum', at = 450 }, { name = 'Diamond', at = 700 }, { name = 'Master', at = 1000 },
+  },
+
+  -- Roblox badges: paste each Badge ID from Creator Hub (Engagement > Badges).
+  -- 0 means that badge is not created yet and is simply skipped.
+  badges = {
+    welcome = 3252681235058986,      -- joined Happy Tractor
+    first_win = 42513605240980,    -- won a round
+    chaodi = 2815072982860861,       -- 'The Overturn': made a successful Chao Di
+    shutout = 1343966510173496,      -- won a round with a shutout
+    high_roller = 1881009317192411,  -- played a round in a High Stakes room
+    millionaire = 0,  -- held 1,000,000 coins
+  },
 
   -- Battle Pass season. Change id to start a new season (XP and claims reset).
   -- productId: paste the Developer Product ID from Creator Hub; 0 means not on sale yet.
   pass = {
-    id = 's1', name = 'Lantern Season', endsAt = 1798761600, xpPerTier = 150, robux = 199, productId = 0,
+    id = 's1', name = 'Lantern Season', endsAt = 1798761600, xpPerTier = 150, robux = 199, productId = 3730084242,
     xp = { play = 25, win = 25, shutout = 15 },
     tiers = {
       { free = { coins = 1650 }, premium = { coins = 5100 } },

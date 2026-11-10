@@ -48,10 +48,21 @@ local scale = new('UIScale', panel, { Scale = 1 })
 local header = new('Frame', panel, { BackgroundColor3 = palette.white, Size = UDim2.new(1, -24, 0, 70), Position = UDim2.fromOffset(12, 12) })
 round(header, 16); stroke(header, INK, 2.5)
 new('UIGradient', header, { Color = ColorSequence.new(color(255, 220, 90), color(220, 120, 20)), Rotation = 90 })
-outlined(text(header, '🏆 RICHEST PLAYERS', 28, palette.white, Enum.Font.FredokaOne, { Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 6) }), 2.5)
-outlined(text(header, 'TOP 50 · ALL SERVERS', 13, CREAM, Enum.Font.FredokaOne, { Size = UDim2.new(1, 0, 0, 18), Position = UDim2.fromOffset(0, 44) }), 1.5)
+local headerTitle = outlined(text(header, '🏆 RICHEST PLAYERS', 28, palette.white, Enum.Font.FredokaOne, { Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 6) }), 2.5)
+local headerSub = outlined(text(header, 'TOP 50 · ALL SERVERS', 13, CREAM, Enum.Font.FredokaOne, { Size = UDim2.new(1, 0, 0, 18), Position = UDim2.fromOffset(0, 44) }), 1.5)
 
-local list = new('ScrollingFrame', panel, { Name = 'List', BackgroundTransparency = 1, BorderSizePixel = 0, Size = UDim2.new(1, -24, 1, -186), Position = UDim2.fromOffset(12, 92),
+-- Two boards: coins (RICHEST) and the ranked ladder (RANKED).
+local tab, lastData = 'coins', nil
+local tabBar = new('Frame', panel, { BackgroundTransparency = 1, Size = UDim2.new(1, -24, 0, 34), Position = UDim2.fromOffset(12, 90) })
+local function tabButton(label, x)
+  local b = new('TextButton', tabBar, { Text = label, TextSize = 16, Font = Enum.Font.FredokaOne, TextColor3 = palette.white, AutoButtonColor = true,
+    BackgroundColor3 = color(50, 58, 96), Size = UDim2.new(0.5, -4, 1, 0), Position = UDim2.new(x, x > 0 and 4 or 0, 0, 0) })
+  round(b, 10); stroke(b, INK, 2)
+  return b
+end
+local coinsTab, rankedTab = tabButton('RICHEST', 0), tabButton('RANKED', 0.5)
+
+local list = new('ScrollingFrame', panel, { Name = 'List', BackgroundTransparency = 1, BorderSizePixel = 0, Size = UDim2.new(1, -24, 1, -226), Position = UDim2.fromOffset(12, 132),
   CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollBarThickness = 6, ScrollBarImageColor3 = GOLD, ScrollingDirection = Enum.ScrollingDirection.Y })
 new('UIListLayout', list, { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder })
 new('UIPadding', list, { PaddingRight = UDim.new(0, 10) })
@@ -73,7 +84,7 @@ round(closeBtn, 17); stroke(closeBtn, INK, 2)
 local MEDALS = { '🥇', '🥈', '🥉' }
 local RANK_COLORS = { { color(255, 215, 80), color(200, 130, 20) }, { color(220, 225, 240), color(140, 150, 175) }, { color(235, 150, 90), color(150, 80, 40) } }
 
-local function row(entry, mine)
+local function row(entry, mine, valueText)
   local top3 = entry.rank <= 3
   local r = new('Frame', list, { Name = 'Row' .. entry.rank, LayoutOrder = entry.rank, BackgroundColor3 = palette.white, Size = UDim2.new(1, 0, 0, top3 and 58 or 48) })
   round(r, 12)
@@ -88,14 +99,45 @@ local function row(entry, mine)
   round(avatar, size / 2)
   local name = outlined(text(r, (entry.name or '?') .. (mine and '  (you)' or ''), top3 and 19 or 16, palette.white, Enum.Font.FredokaOne,
     { Size = UDim2.new(1, -250, 1, 0), Position = UDim2.fromOffset(66 + size, 0), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }), 1.5)
-  outlined(text(r, fmt(entry.coins), top3 and 19 or 16, top3 and palette.white or GOLD, Enum.Font.FredokaOne,
+  outlined(text(r, valueText or fmt(entry.coins), top3 and 19 or 16, top3 and palette.white or GOLD, Enum.Font.FredokaOne,
     { Size = UDim2.new(0, 150, 1, 0), Position = UDim2.new(1, -160, 0, 0), TextXAlignment = Enum.TextXAlignment.Right }), 1.5)
   return r
 end
 
 local function render(data)
+  lastData = data
   for _, child in ipairs(list:GetChildren()) do if child:IsA('Frame') then child:Destroy() end end
   status.Visible = false
+  local ranked = tab == 'ranked'
+  coinsTab.BackgroundColor3 = ranked and color(50, 58, 96) or color(220, 140, 30)
+  rankedTab.BackgroundColor3 = ranked and color(220, 140, 30) or color(50, 58, 96)
+  headerTitle.Text = ranked and '🏆 RANKED LADDER' or '🏆 RICHEST PLAYERS'
+  headerSub.Text = ranked and 'WIN ROUNDS TO CLIMB · TOP 50' or 'TOP 50 · ALL SERVERS'
+  if ranked then
+    local entries = data.rankEntries or {}
+    if not data.available then
+      status.Text = 'The ladder turns on once the game is published and saving works.'
+      status.Visible = true
+    elseif #entries == 0 then
+      status.Text = 'Nobody is ranked yet. Win a round to take the first spot!'
+      status.Visible = true
+    end
+    local place
+    for _, entry in ipairs(entries) do
+      if entry.userId == me.UserId then place = entry.rank end
+      row(entry, entry.userId == me.UserId, (entry.tier or 'Bronze') .. ' ' .. fmt(entry.points))
+    end
+    -- Points still needed for the next tier.
+    local points, nextTier = data.yourRankPoints or 0, nil
+    for _, tier in ipairs(data.ranks or {}) do
+      if tier.at > points then nextTier = tier; break end
+    end
+    footerRank.Text = (place and ('YOU · #' .. place) or 'YOU') .. ' · ' .. string.upper(data.yourRankTier or 'Bronze')
+    footerCoins.Text = fmt(points) .. ' RP' .. (nextTier and ('  (' .. (nextTier.at - points) .. ' to ' .. nextTier.name .. ')') or '')
+    footerCoins.TextSize = 16
+    return
+  end
+  footerCoins.TextSize = 22
   if not data.available then
     status.Text = 'The leaderboard turns on once the game is published and saving works.'
     status.Visible = true
@@ -123,6 +165,8 @@ local function open()
 end
 C.openLeaderboard = open
 local function close() shade.Visible = false end
+coinsTab.Activated:Connect(function() playSound('click'); tab = 'coins'; if lastData then render(lastData) end end)
+rankedTab.Activated:Connect(function() playSound('click'); tab = 'ranked'; if lastData then render(lastData) end end)
 closeBtn.Activated:Connect(function() playSound('click'); close() end)
 shade.Activated:Connect(close)
 

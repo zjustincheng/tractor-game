@@ -1,3 +1,5 @@
+-- Clamp that tolerates max < min (tiny phone screens) instead of erroring.
+local function safeClamp(v, lo, hi) if hi < lo then hi = lo end return math.clamp(v, lo, hi) end
 -- Happy Tractor client, part 6/14: ShopRewards.
 -- Lines 2479-2942 of the original single script. Shared values arrive in
 -- `C`: ones that change at runtime are read as C.name; fixed ones are
@@ -9,14 +11,14 @@ local robloxGearImages, root = C.robloxGearImages, C.root
 
 -- Card Back Visual Helper
 local function renderCardBack(parent, w, h, themeId)
-  local card = frame(parent, 'CardBack', palette.panel, math.clamp(math.floor(h * 0.08), 4, 7))
+  local card = frame(parent, 'CardBack', palette.panel, safeClamp(math.floor(h * 0.08), 4, 7))
   card.Size = UDim2.fromOffset(w, h)
   card.BorderSizePixel = 0
   -- Shared pieces for the premium backs: an inset frame line, a round
   -- medallion and a glyph, all drawn (no borrowed Roblox item pictures).
   local function inset(tint, alpha)
     local pad = math.max(2, math.floor(w * 0.08))
-    local line = frame(card, 'Inset', tint, math.clamp(math.floor(h * 0.05), 2, 5))
+    local line = frame(card, 'Inset', tint, safeClamp(math.floor(h * 0.05), 2, 5))
     line.BackgroundTransparency = 1
     outline(line, tint, 1).Transparency = alpha or 0.25
     rect(line, pad, pad, w - pad * 2, h - pad * 2)
@@ -81,7 +83,7 @@ local function renderCardBack(parent, w, h, themeId)
     gradient(card, color(26, 104, 62), color(10, 48, 28), 90)
     outline(card, palette.gold, 1.4)
     local inset = math.max(2, math.floor(w * 0.08))
-    local frameLine = frame(card, 'Inset', palette.goldBright, math.clamp(math.floor(h * 0.05), 2, 5))
+    local frameLine = frame(card, 'Inset', palette.goldBright, safeClamp(math.floor(h * 0.05), 2, 5))
     frameLine.BackgroundTransparency = 1
     outline(frameLine, palette.goldBright, 1).Transparency = 0.35
     rect(frameLine, inset, inset, w - inset * 2, h - inset * 2)
@@ -293,14 +295,14 @@ function arenaUI.initRewardsUI()
     '• Novice (2K–60K Coins): +1K Win (+500 Shutout Bonus)\n' ..
     '• Pro (8K–200K Coins): +2.5K Win (+1.2K Shutout Bonus)\n' ..
     '• Master (100K+ Coins): +8K Win (+4K Shutout Bonus)\n' ..
-    '• Daily Login Streaks: Log in 7 days in a row, up to +100K Coins! Missing a day starts over.',
+    '• Daily Login Streaks: Log in 7 days in a row, up to +30K Coins! Missing a day starts over.',
     9, palette.cream)
   tipsBody.TextXAlignment = Enum.TextXAlignment.Left
 
   local function layoutRewards(w, h)
     if not rShade.Visible then return end
-    local mw = math.clamp(w - 40, 320, 560)
-    local mh = math.clamp(h - 40, 360, 530)
+    local mw = safeClamp(w - 40, 320, 560)
+    local mh = safeClamp(h - 40, 360, 530)
     rect(rModal, (w - mw) / 2, (h - mh) / 2, mw, mh)
     rect(rTitle, 20, 14, mw - 60, 22)
     rect(rHint, 20, 38, mw - 60, 14)

@@ -333,14 +333,14 @@ return function(Cards, S, Rules, Scoring, Trained)
   Practice.trumpCount = trumpCount
 
   -- Bots challenge only when the new suit clearly strengthens their hand:
-  -- at least 3 more trumps (5 when overriding their own team's choice) and a
+  -- at least 2 more trumps (4 when overriding their own team's choice) and a
   -- quarter of the hand in trump. Among those, the most trumps wins.
   function Practice.chooseChaodi(state, seat)
     local options = Practice.chaodiOptions(state, seat)
     local hand = state.hands[seat]
     local current = trumpCount(hand, state.trump.level, state.trump.suit)
     local sameTeam = Cards.team(seat) == Cards.team(state.kittyHolder or state.dealer)
-    local needed = sameTeam and 5 or 3
+    local needed = sameTeam and 4 or 2
     local bestIndex, bestCount
     for index, option in ipairs(options) do
       local count = trumpCount(hand, state.trump.level, option.suit)
@@ -463,6 +463,32 @@ return function(Cards, S, Rules, Scoring, Trained)
     end
     state.revision=state.revision+1
     return true,state.lastMessage
+  end
+  -- Concede: the seat's team gives up the round once play has started.
+  -- Challengers are settled on the points they hold now (at least 5); a conceding dealer
+  -- team is overturned (at least the minimum overturn score). No kitty bonus.
+  function Practice.forfeit(state, seat, now)
+    if state.done then return false, 'This round is already over.' end
+    if state.phase ~= 'tricks' and state.phase ~= 'trick-review' then return false, 'You can concede once play has started.' end
+    local team = Cards.team(seat)
+    local challengerPoints = (state.points[state.attackingTeam == 'A' and 2 or 1] or 0) + (state.penaltyPoints or 0)
+    local overturn = 2 * 20 * (state.playerCount / 2)
+    local score
+    if team == state.attackingTeam then score = math.max(challengerPoints, overturn)
+    -- A conceding challenger team is never charged the full Total Shutout (x4):
+    -- with no points yet it settles as a Near Shutout (x2).
+    else score = math.min(math.max(challengerPoints, 5), overturn - 5) end
+    state.done, state.phase = true, 'finished'
+    state.forfeitTeam = team
+    state.settlement = Scoring.settle({ playerCount = state.playerCount, attackingTeam = state.attackingTeam, levels = state.levels,
+      trickPoints = score, finalTrickWinnerTeam = state.attackingTeam, finalWinningCards = {}, finalWinningStructure = nil,
+      kitty = state.kitty or {}, gamblePenaltyPoints = 0 })
+    if state.quickMatch then
+      state.settlement.winner = state.settlement.outcome.advancingRole == 'attackers' and state.attackingTeam or (state.attackingTeam == 'A' and 'B' or 'A')
+    end
+    table.insert(state.events, { kind = 'forfeit', seat = seat, team = team, at = now or 0 })
+    state.revision = state.revision + 1
+    return true
   end
   function Practice.stepBot(state)
     if state.phase~='tricks' or state.done or isHuman(state,state.turn) then return false end

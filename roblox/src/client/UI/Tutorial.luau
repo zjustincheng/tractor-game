@@ -1,3 +1,5 @@
+-- Clamp that tolerates max < min (tiny phone screens) instead of erroring.
+local function safeClamp(v, lo, hi) if hi < lo then hi = lo end return math.clamp(v, lo, hi) end
 -- Happy Tractor client: first-time tutorial.
 -- 1) A short "How to play" slideshow (shown once to new players, and any time
 --    from the home screen's ? button).
@@ -207,7 +209,7 @@ local closeBtn = new('TextButton', panel, { Text = 'X', TextSize = 18, Font = En
 round(closeBtn, 17); stroke(closeBtn, INK, 2)
 
 local function show(i)
-  index = math.clamp(i, 1, #SLIDES)
+  index = safeClamp(i, 1, #SLIDES)
   local s = SLIDES[index]
   emojiLabel.Text = s.emoji
   titleLabel.Text = s.title

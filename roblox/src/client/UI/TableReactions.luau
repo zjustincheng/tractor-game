@@ -1,3 +1,5 @@
+-- Clamp that tolerates max < min (tiny phone screens) instead of erroring.
+local function safeClamp(v, lo, hi) if hi < lo then hi = lo end return math.clamp(v, lo, hi) end
 -- Happy Tractor client, part 10/14: TableReactions.
 -- Lines 4117-4284 of the original single script. Shared values arrive in
 -- `C`: ones that change at runtime are read as C.name; fixed ones are
@@ -52,7 +54,7 @@ end
 function arenaUI.showBubble(seat, text)
   local bubble = seat == 1 and selfBubble or (seats[seat] and seats[seat].bubble)
   if not bubble or not text or text == '' then return end
-  local width = math.clamp(#text * 6 + 24, 90, 190)
+  local width = safeClamp(#text * 6 + 24, 90, 190)
   if seat == 1 then
     arenaUI.R.say(bubble, text, 28, -32, width)
     return

@@ -1,3 +1,5 @@
+-- Clamp that tolerates max < min (tiny phone screens) instead of erroring.
+local function safeClamp(v, lo, hi) if hi < lo then hi = lo end return math.clamp(v, lo, hi) end
 -- Happy Tractor client: the Coins & VIP tab of the shop.
 -- A VIP banner across the top and one tall card per coin pack, styled like
 -- the shops of the big Roblox games: big glowing art, tier colours, value
@@ -202,7 +204,7 @@ function C.layoutCoinShop(width, height)
     vip.glow.Position = UDim2.fromOffset(56, bh / 2); vip.glow.Size = UDim2.fromOffset(120, 120)
     vip.icon.Position = UDim2.fromOffset(56, bh / 2); vip.icon.Size = UDim2.fromOffset(86, 86)
     local textX = 112
-    local buyW = math.clamp(math.floor(bw * 0.24), 96, 130)
+    local buyW = safeClamp(math.floor(bw * 0.24), 96, 130)
     rect(vip.title, textX, 22, bw - textX - buyW - 24, 30)
     rect(vip.perk, textX, 54, bw - textX - buyW - 24, 34)
     rect(vip.buy, bw - buyW - 14, (bh - 44) / 2, buyW, 44)
@@ -227,7 +229,7 @@ function C.layoutCoinShop(width, height)
       card.cx, card.cy = cx, cy
       local ay = cy + iconSize / 2 + 2
       rect(card.amount, 0, ay, cw, 32)
-      card.amount.TextSize = math.clamp(math.floor(cw / 5.2), 20, 32)
+      card.amount.TextSize = safeClamp(math.floor(cw / 5.2), 20, 32)
       rect(card.unit, 0, ay + 30, cw, 16)
       if card.bonus then rect(card.bonus, (cw - 104) / 2, ay + 50, 104, 22) end
       rect(card.buy, 10, ch - 54, cw - 20, 44)

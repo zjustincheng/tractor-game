@@ -1,3 +1,5 @@
+-- Clamp that tolerates max < min (tiny phone screens) instead of erroring.
+local function safeClamp(v, lo, hi) if hi < lo then hi = lo end return math.clamp(v, lo, hi) end
 -- Happy Tractor client: the Emotes, Card Backs and Table Felts tabs of the
 -- shop, as grids of rarity-coloured tiles with a big preview of each item.
 -- Rarity comes from the price within its tab: free items are Common, paid
@@ -197,7 +199,7 @@ function C.layoutShopGrid(tab, width, height)
     end
     local y = 30 + previewH + 8
     rect(t.name, 8, y, tw - 16, 20)
-    t.name.TextSize = math.clamp(math.floor(tw / 9), 13, 17)
+    t.name.TextSize = safeClamp(math.floor(tw / 9), 13, 17)
     -- Description only where it fits between the name and the button.
     local room = (th - 52) - (y + 22)
     local descH = tab == 'emote' and 0 or math.min(30, room)

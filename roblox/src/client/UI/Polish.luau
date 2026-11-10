@@ -1,3 +1,5 @@
+-- Clamp that tolerates max < min (tiny phone screens) instead of erroring.
+local function safeClamp(v, lo, hi) if hi < lo then hi = lo end return math.clamp(v, lo, hi) end
 -- Happy Tractor client: visual polish for the home screen and tier picker.
 -- Runs after the screens are built and restyles them in the shop's look:
 -- bright gradient cards, big art, chunky titles and coloured buttons. It
@@ -168,12 +170,12 @@ local function layoutPolish()
         if mode.button then rect(mode.button, 10, h - btnH - 8, w - 20, btnH) end
         local titleY = h - btnH - 8 - 44
         rect(mode.titleLabel, 8, titleY, w - 16, 26)
-        mode.titleLabel.TextSize = math.clamp(math.floor(w / 11), 16, 24)
+        mode.titleLabel.TextSize = safeClamp(math.floor(w / 11), 16, 24)
         rect(mode.subLabel, 8, titleY + 26, w - 16, 14)
         local artTop, artBottom = 8, titleY - 4
         local artH = math.max(30, artBottom - artTop)
         rect(mode.art, 0, artTop, w, artH)
-        local ch = math.clamp(math.floor(artH * 0.82), 40, 96)
+        local ch = safeClamp(math.floor(artH * 0.82), 40, 96)
         local cw = math.floor(ch * 0.7)
         if mode.fanSize ~= ch then
           for _, old in ipairs(mode.fanCards) do old:Destroy() end
@@ -208,7 +210,7 @@ local function layoutPolish()
         local pill = card:FindFirstChild('StakePill')
         local pillY = pill and pill.Position.Y.Offset or 140
         local top = 52
-        local size = math.clamp(math.min(w - 40, pillY - top - 8), 60, 170)
+        local size = safeClamp(math.min(w - 40, pillY - top - 8), 60, 170)
         t.cx, t.cy = w / 2, top + (pillY - top) / 2
         t.art.Size = UDim2.fromOffset(size, size)
         t.glow.Size = UDim2.fromOffset(size * 1.15, size * 1.15)

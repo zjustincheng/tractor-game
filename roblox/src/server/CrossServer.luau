@@ -11,7 +11,7 @@ return function(Matchmaker, deps)
   local CrossServer = {}
   local memory, messaging, teleport = deps.memory, deps.messaging, deps.teleport
   local placeId, jobId = deps.placeId, deps.jobId
-  local QUEUE_TTL, LOCK_TTL, MATCH_TTL = 180, 6, 600
+  local QUEUE_TTL, LOCK_TTL, MATCH_TTL = 180, 6, 1800 -- match records outlive a round so players can reconnect
   local queueMap = memory:GetSortedMap('TractorQueue')
   local lockMap = memory:GetSortedMap('TractorLock')
   local matchMap = memory:GetSortedMap('TractorMatches')
@@ -126,6 +126,28 @@ return function(Matchmaker, deps)
       options.ServerInstanceId = invite.jobId
       options:SetTeleportData({ joinSquad = invite.fromId })
       teleport:TeleportAsync(invite.placeId, { player }, options)
+    end)
+  end
+
+  -- Reconnecting: remembers which server holds a player's unfinished round.
+  local rejoinMap = memory:GetSortedMap('TractorRejoin')
+  function CrossServer.rememberSeat(userId, matchId, seconds)
+    return try(function() rejoinMap:SetAsync(tostring(userId), { jobId = jobId, matchId = matchId }, seconds) end)
+  end
+  function CrossServer.recallSeat(userId)
+    local ok, record = try(function() return rejoinMap:GetAsync(tostring(userId)) end)
+    return ok and type(record) == 'table' and record or nil
+  end
+  function CrossServer.forgetSeat(userId)
+    return try(function() rejoinMap:RemoveAsync(tostring(userId)) end)
+  end
+  -- Back to a public server that still has the player's table.
+  function CrossServer.rejoinServer(player, targetJobId)
+    return try(function()
+      local options = deps.newTeleportOptions()
+      options.ServerInstanceId = targetJobId
+      options:SetTeleportData({ rejoin = true })
+      teleport:TeleportAsync(placeId, { player }, options)
     end)
   end
 

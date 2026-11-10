@@ -1,3 +1,5 @@
+-- Clamp that tolerates max < min (tiny phone screens) instead of erroring.
+local function safeClamp(v, lo, hi) if hi < lo then hi = lo end return math.clamp(v, lo, hi) end
 -- Happy Tractor client, part 3/14: Lobby.
 -- Lines 970-1985 of the original single script. Shared values arrive in
 -- `C`: ones that change at runtime are read as C.name; fixed ones are
@@ -940,7 +942,7 @@ C.refreshTierLocks = function()
       local bar = pLock:FindFirstChild('Bar')
       if bar then
         local fill = bar:FindFirstChild('Fill')
-        if fill then fill.Size = UDim2.new(math.clamp(coins / 8000, 0, 1), 0, 1, 0) end
+        if fill then fill.Size = UDim2.new(safeClamp(coins / 8000, 0, 1), 0, 1, 0) end
         local txt = bar:FindFirstChild('Text')
         local short = C.currentLayout and (C.currentLayout.width < 600 or C.currentLayout.short)
         if txt then txt.Text = 'Need ' .. formatK(math.max(0, 8000 - coins)) .. ' more' .. (short and '' or ('  ·  ' .. formatK(coins) .. ' / 8K')) end
@@ -963,7 +965,7 @@ C.refreshTierLocks = function()
       local bar = mLock:FindFirstChild('Bar')
       if bar then
         local fill = bar:FindFirstChild('Fill')
-        if fill then fill.Size = UDim2.new(math.clamp(coins / 100000, 0, 1), 0, 1, 0) end
+        if fill then fill.Size = UDim2.new(safeClamp(coins / 100000, 0, 1), 0, 1, 0) end
         local txt = bar:FindFirstChild('Text')
         local short = C.currentLayout and (C.currentLayout.width < 600 or C.currentLayout.short)
         if txt then txt.Text = 'Need ' .. formatK(math.max(0, 100000 - coins)) .. ' more' .. (short and '' or ('  ·  ' .. formatK(coins) .. ' / 100K')) end

@@ -5,18 +5,18 @@ local Persistence = dofile('roblox/src/server/Persistence.luau')(nil, Catalog, n
 local DAY = 86400
 local START = 20000 * DAY + 100
 local function session() return { coins = 0, stats = {}, owned = {}, equipped = {}, receipts = {} } end
-assert(#Catalog.loginStreak == 7 and Catalog.loginStreak[1] == 5000 and Catalog.loginStreak[7] == 100000)
+assert(#Catalog.loginStreak == 7 and Catalog.loginStreak[1] == 3000 and Catalog.loginStreak[7] == 30000)
 
 -- A new player starts on day 1 and is paid once a day.
 local s = session()
 assert(Persistence.streakDay(s, START) == 1)
 local day, coins = Persistence.claimDaily(s, START)
-assert(day == 1 and coins == 5000 and s.coins == 5000)
+assert(day == 1 and coins == 3000 and s.coins == 3000)
 assert(Persistence.streakDay(s, START) == 1, 'still shows the day just claimed')
-assert(Persistence.claimDaily(s, START + 60) == nil and s.coins == 5000, 'one claim per day')
+assert(Persistence.claimDaily(s, START + 60) == nil and s.coins == 3000, 'one claim per day')
 
 -- Each following day pays the next amount, then day 7 loops back to day 1.
-local total = 5000
+local total = 3000
 for expected = 2, 7 do
   local now = START + (expected - 1) * DAY
   assert(Persistence.streakDay(s, now) == expected, 'next day shown before claiming')

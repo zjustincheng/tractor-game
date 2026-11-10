@@ -1,3 +1,5 @@
+-- Clamp that tolerates max < min (tiny phone screens) instead of erroring.
+local function safeClamp(v, lo, hi) if hi < lo then hi = lo end return math.clamp(v, lo, hi) end
 -- Happy Tractor client, part 12/14: Layout.
 -- Lines 4536-5379 of the original single script. Shared values arrive in
 -- `C`: ones that change at runtime are read as C.name; fixed ones are
@@ -162,6 +164,18 @@ C.resize = function()
   local isHome = current == nil or current.done
   local l = Layout.calculate(size.X, size.Y, current and #current.hand or 25)
   C.currentLayout = l
+  -- Landscape phones: while declaring / Chao Di, the option strip needs room,
+  -- so borrow a little height from the table instead of burying the hand.
+  local tightPhase = current and not current.done and (current.phase == 'declaration' or current.phase == 'chaodi')
+  if l.short and tightPhase then
+    l.actionY = l.actionY - 14
+    l.arenaHeight = math.max(70, l.arenaHeight - 14)
+  elseif l.short and current and not current.done then
+    -- During play a landscape phone shows one status line, not two, and the
+    -- table gets the height back so played cards stay clear of the text.
+    l.oneLine = true
+    l.arenaHeight = l.arenaHeight + 20
+  end
   local w, h = l.width, l.height
 
   -- Header. The trump/points panel sits on the left in play; controls flow
@@ -291,7 +305,7 @@ C.resize = function()
     local avatarSize = l.short and 28 or (l.compact and 34 or 38)
     local sh = avatarSize + 58
     local x = seat == 2 and w - sw - 14 or (seat == 4 and 14 or (w - sw) / 2)
-    local y = seat % 2 == 1 and (arenaY - 18) or (arenaY + math.clamp(math.floor(ah * 0.48 - sh * 0.5) + 14, 76, ah - sh))
+    local y = seat % 2 == 1 and (arenaY - 18) or (arenaY + safeClamp(math.floor(ah * 0.48 - sh * 0.5) + 14, 76, ah - sh))
     rect(s.holder, x, y, sw, sh)
     rect(s.avatar, (sw - avatarSize) / 2, 6, avatarSize, avatarSize)
     rect(s.name, 0, avatarSize + 8, sw, 15)
@@ -314,6 +328,13 @@ C.resize = function()
       s.details.TextXAlignment = Enum.TextXAlignment.Left
       s.details.TextSize = 10
       rect(s.declarationCards, partnerWidth - 74, -22, 68, 22)
+      -- Landscape phones: keep the partner panel and its declared-card chip
+      -- below the header buttons instead of on top of them.
+      if l.short then
+        -- Well left of centre, clear of every played card in the middle.
+        rect(s.holder, math.max(140, w / 2 - partnerWidth - 96), arenaY - 2, partnerWidth, 52)
+        rect(s.declarationCards, partnerWidth + 6, 15, 68, 22)
+      end
       s.count.Visible = current and current.botCoins and current.botCoins[seat] ~= nil or false
     end
     s.details.Visible = not l.short
@@ -346,8 +367,8 @@ C.resize = function()
   -- Home Screen (1252.jpg format) & Tier Screen (1251.jpg format) Layout
   -- Below 600px wide the lobby stacks vertically instead of overflowing.
   local narrowLobby = w < 600
-  local lobbyW = narrowLobby and (w - 16) or math.clamp(w - 24, 600, 1040)
-  local lobbyH = narrowLobby and math.min(h - 24, 900) or math.clamp(h - 36, 360, 580)
+  local lobbyW = narrowLobby and (w - 16) or safeClamp(w - 24, 600, 1040)
+  local lobbyH = narrowLobby and math.min(h - 24, 900) or safeClamp(h - 36, 360, 580)
   local lobbyX = math.floor((w - lobbyW) / 2)
   local lobbyY = math.max(10, math.floor((h - lobbyH) / 2))
 
@@ -489,7 +510,7 @@ C.resize = function()
   rect(home.mailBtn, lobbyW - 24 - 110, 7, 32, 32)
 
   local centerH = lobbyH - 128
-  local heroW = math.clamp(math.floor(lobbyW * 0.30), 160, 260)
+  local heroW = safeClamp(math.floor(lobbyW * 0.30), 160, 260)
   rect(home.heroCard, 12, 64, heroW, centerH)
   rect(home.heroTag, 8, 8, heroW - 16, 20)
   rect(home.dragonFrame, 8, 32, heroW - 16, 68)
@@ -503,7 +524,7 @@ C.resize = function()
   home.dragonFrame.Visible, home.heroDesc.Visible = false, false
   rect(home.heroTitle, 8, 34, heroW - 16, 22)
   local squadTop, squadBottom = 62, centerH - 42 - 8 - 66
-  arenaUI.squadLayout = { narrow = false, rowH = math.clamp(math.floor((squadBottom - squadTop - 8) / 5), 20, 34) }
+  arenaUI.squadLayout = { narrow = false, rowH = safeClamp(math.floor((squadBottom - squadTop - 8) / 5), 20, 34) }
   rect(home.squadMembers, 8, squadTop, heroW - 16, squadBottom - squadTop)
   rect(home.squadInvite, 8, squadBottom + 6, heroW - 16, 28)
   local halfW = math.floor((heroW - 24) / 2)
@@ -576,7 +597,7 @@ C.resize = function()
   rect(tier.matchLength, lobbyW - 24 - 105 - 168, 7, 160, 32)
   rect(tier.coinPill, lobbyW - 24 - 105, 9, 96, 28)
 
-  local tierSideW = math.clamp(math.floor(lobbyW * 0.20), 110, 160)
+  local tierSideW = safeClamp(math.floor(lobbyW * 0.20), 110, 160)
   rect(tier.sidebar, 12, 64, tierSideW, centerH)
   local tierTabH = math.floor((centerH - 24) / 4)
   rect(tier.tab6P, 6, 6 + (tierTabH + 4) * 0, tierSideW - 12, tierTabH)
@@ -656,7 +677,7 @@ C.resize = function()
   arenaUI.renderSquad()
 
   -- Settlement modal, sized to its content.
-  local settleW = math.clamp(w - 24, 340, 520)
+  local settleW = safeClamp(w - 24, 340, 520)
   local settleH = 312
   rect(settleUI.modal, (w - settleW) / 2, (h - settleH) / 2, settleW, settleH)
   rect(settleUI.banner, 16, 14, settleW - 32, 44)
@@ -697,8 +718,8 @@ C.resize = function()
   end
 
   if queueUI and queueUI.modal then
-    local qW = math.clamp(w - 48, 380, 520)
-    local qH = math.clamp(h - 60, 320, 380)
+    local qW = safeClamp(w - 48, 380, 520)
+    local qH = safeClamp(h - 60, 320, 380)
     rect(queueUI.modal, (w - qW) / 2, (h - qH) / 2, qW, qH)
     rect(queueUI.banner, 16, 14, qW - 32, 36)
     rect(queueUI.tierLabel, 16, 54, qW - 32, 22)
@@ -723,10 +744,10 @@ C.resize = function()
     rect(queueUI.cancelBtn, qW - 116, qH - 52, 100, 38)
   end
 
-  rect(notice, 16, l.actionY - 2, w - 32, 22)
+  rect(notice, 16, l.oneLine and (l.actionY + 19) or (l.actionY - 2), w - 32, 22)
   notice.TextSize = l.compact and 11 or 14
-  rect(phaseRibbon, 16, l.actionY + 19, w - 32, 22)
-  rect(phaseLine, 20, l.actionY + 21, w - 40, 18)
+  rect(phaseRibbon, 16, l.oneLine and -200 or (l.actionY + 19), w - 32, 22)
+  rect(phaseLine, 20, l.oneLine and -200 or (l.actionY + 21), w - 40, 18)
   rect(actionBar, 0, l.actionY + 43, w, 40)
   rect(clear, startX, 0, clearW, 38)
   if current and current.phase == 'doubling' then
@@ -740,7 +761,7 @@ C.resize = function()
   tableChatBtn.TextYAlignment = Enum.TextYAlignment.Center
 
   if chatUI and chatUI.popover then
-    local cpW = math.clamp(w - 24, 300, 420)
+    local cpW = safeClamp(w - 24, 300, 420)
     local pad, gap = 12, 8
     local innerW = cpW - pad * 2
     -- Targets: one row when every pill fits at 64px, otherwise rows of three.
@@ -782,7 +803,7 @@ C.resize = function()
     y = y + math.ceil(#chatUI.phraseBtns / 2) * 34
     local headerH = 46
     local cpH = math.min(headerH + y + 18, math.max(220, l.actionY - 16))
-    local cpX = math.clamp(startX + totalBarW - cpW, 12, w - cpW - 12)
+    local cpX = safeClamp(startX + totalBarW - cpW, 12, w - cpW - 12)
     local cpY = math.max(12, l.actionY - cpH - 8)
     rect(chatUI.popover, cpX, cpY, cpW, cpH)
     rect(chatUI.title, pad, 8, 120, 18)
@@ -798,7 +819,7 @@ C.resize = function()
   if current and current.phase == 'chaodi' then
     rect(actionBar, 0, l.actionY + 85, w, 40)
   end
-  local declarationHandOffset = current and (current.phase == 'declaration' or current.phase == 'chaodi') and 44 or 0
+  local declarationHandOffset = current and (current.phase == 'declaration' or current.phase == 'chaodi') and (l.short and 22 or 44) or 0
   rect(handFrame, 16, l.handY + declarationHandOffset, w - 32, math.max(80, l.handHeight - declarationHandOffset))
   handFrame.CanvasSize = UDim2.fromOffset(l.contentWidth, 0)
   rect(footer, 12, h - 34, w - 24, 30)

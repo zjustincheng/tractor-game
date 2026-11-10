@@ -1,3 +1,5 @@
+-- Clamp that tolerates max < min (tiny phone screens) instead of erroring.
+local function safeClamp(v, lo, hi) if hi < lo then hi = lo end return math.clamp(v, lo, hi) end
 -- Happy Tractor client, part 11/14: Hand.
 -- Lines 4285-4535 of the original single script. Shared values arrive in
 -- `C`: ones that change at runtime are read as C.name; fixed ones are
@@ -53,7 +55,7 @@ local function cardFace(parent, card, name, width, height, callback)
     end)
   end
   object.Size = UDim2.fromOffset(width, height)
-  corner(object, math.clamp(math.floor(height * 0.08), 5, 8))
+  corner(object, safeClamp(math.floor(height * 0.08), 5, 8))
   gradient(object, palette.cardFace, palette.cardGrad, 50)
   local stroke = outline(object, palette.cardBorder, 1)
 
@@ -68,10 +70,10 @@ local function cardFace(parent, card, name, width, height, callback)
 
   -- Corner index (rank over suit), mirrored upside down in the far corner.
   local rankText = card.joker and (card.joker == 'big' and 'BIG' or 'SM') or card.rank
-  local rankSize = card.joker and math.clamp(math.floor(height * 0.16), 10, 14) or math.clamp(math.floor(height * 0.23), 14, 26)
+  local rankSize = card.joker and safeClamp(math.floor(height * 0.16), 10, 14) or safeClamp(math.floor(height * 0.23), 14, 26)
   if width < 70 then rankSize = math.min(rankSize, 20) end
   local indexW, rankH, pipH = math.min(24, width - 4), math.floor(height * 0.26), math.floor(height * 0.2)
-  local pipSize = math.clamp(math.floor(height * 0.18), 11, 20)
+  local pipSize = safeClamp(math.floor(height * 0.18), 11, 20)
   local rank = label(object, 'Rank', rankText, rankSize, ink)
   rank.Font = Enum.Font.FredokaOne
   rank.TextWrapped = false
@@ -106,7 +108,7 @@ local function cardFace(parent, card, name, width, height, callback)
     motif.Font = Enum.Font.GothamBold
     motif.TextWrapped = false
     rect(motif, 0, 2, artW, artH * 0.72)
-    local caption = label(panel, 'Caption', 'JOKER', math.clamp(math.floor(artH * 0.16), 8, 18), ink)
+    local caption = label(panel, 'Caption', 'JOKER', safeClamp(math.floor(artH * 0.16), 8, 18), ink)
     caption.Font = Enum.Font.FredokaOne
     caption.TextWrapped = false
     rect(caption, 0, artH * 0.7, artW, artH * 0.28)
@@ -135,7 +137,7 @@ local function getDealingState()
   if not current.dealingDuration or current.dealingDuration <= 0 then return #current.hand, false, 0 end
   local elapsed = math.max(0, (C.state.serverTime + os.clock() - C.receivedAt) - current.dealingStartedAt)
   local total = #current.hand
-  local dealtCount = math.clamp(math.floor(elapsed / current.dealingDuration * current.handSize) + 1, 1, total)
+  local dealtCount = safeClamp(math.floor(elapsed / current.dealingDuration * current.handSize) + 1, 1, total)
   local isDealing = dealtCount < total
   return dealtCount, isDealing, elapsed
 end C.getDealingState = getDealingState

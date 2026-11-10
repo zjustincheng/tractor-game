@@ -36,6 +36,8 @@ for _, name in ipairs({
   'Profile',        -- player profile page and cosmetics (avatar in the home header)
   'Tracker',        -- VIP markers: cards safe to gamble, suits opponents are out of
   'BattlePass',     -- seasonal XP, free and premium reward tracks
+  'Forfeit',        -- Concede button in the footer during play
+  'Rejoin',         -- banner offering your seat back after a disconnect
 }) do
   require(ui:WaitForChild(name))(C)
 end

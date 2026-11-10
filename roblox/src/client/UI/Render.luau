@@ -1,3 +1,5 @@
+-- Clamp that tolerates max < min (tiny phone screens) instead of erroring.
+local function safeClamp(v, lo, hi) if hi < lo then hi = lo end return math.clamp(v, lo, hi) end
 -- Happy Tractor client, part 13/14: Render.
 -- Lines 5380-6101 of the original single script. Shared values arrive in
 -- `C`: ones that change at runtime are read as C.name; fixed ones are
@@ -34,7 +36,7 @@ C.render = function()
       tier.noviceJoinBtn.TextColor3 = palette.white
     elseif coins > 60000 then
       if nGrad then nGrad.Enabled = false end
-      tier.noviceJoinBtn.Text = 'TIER EXCEEDED (Max 60K)'
+      tier.noviceJoinBtn.Text = 'MAX 60K COINS'
       tier.noviceJoinBtn.BackgroundColor3 = palette.panelLight
       tier.noviceJoinBtn.TextColor3 = palette.white
     else
@@ -54,7 +56,7 @@ C.render = function()
       tier.proJoinBtn.TextColor3 = palette.white
     elseif coins > 200000 then
       if pGrad then pGrad.Enabled = false end
-      tier.proJoinBtn.Text = 'TIER EXCEEDED (Max 200K)'
+      tier.proJoinBtn.Text = 'MAX 200K COINS'
       tier.proJoinBtn.BackgroundColor3 = palette.panelLight
       tier.proJoinBtn.TextColor3 = palette.white
     else
@@ -137,7 +139,7 @@ C.render = function()
       arenaUI.goalTitle.Text = aIsAttacking and 'OPPONENT POINTS' or 'YOUR TEAM POINTS'
     end
   end
-  local pct = math.clamp(oppPoints / threshold, 0, 1)
+  local pct = safeClamp(oppPoints / threshold, 0, 1)
   meterBarFill.Size = UDim2.fromScale(pct, 1)
   if arenaUI.goalBarFill then arenaUI.goalBarFill.Size = UDim2.fromScale(pct, 1) end
 
@@ -272,6 +274,14 @@ C.render = function()
       local reliefDesc = (relief > 0) and ('  ·  Relief: +' .. formatK(relief)) or ''
       settleUI.coinSub.Text = 'Table ' .. formatK(baseStake) .. ' × ' .. multDesc .. capDesc .. '\n'
         .. ((result.trickCoins or 0) > 0 and ('Points +' .. formatK(result.trickCoins)) or '') .. reliefDesc
+    end
+    -- Ranked ladder change for this round, when the server sent one.
+    if result.rankPoints then
+      local change = result.rankDelta or 0
+      local sign = change > 0 and '+' or (change < 0 and '−' or '±')
+      local sub = settleUI.coinSub.Text
+      settleUI.coinSub.Text = sub .. (sub:sub(-1) == '\n' and '' or '   ·   ')
+        .. 'Rank ' .. sign .. math.abs(change) .. ' (' .. tostring(result.rankTier or 'Bronze') .. ' ' .. result.rankPoints .. ' RP)'
     end
   end
 
@@ -419,7 +429,7 @@ C.render = function()
     local stripW = C.currentLayout.compact and 54 or 64
     local stripGap = C.currentLayout.compact and 4 or 6
     local suitTotal = #suitOrder * stripW + (#suitOrder - 1) * stripGap
-    local jokerW = C.currentLayout.compact and 78 or 96
+    local jokerW = C.currentLayout.compact and 108 or 128
     local jokerTotal = #jokerOrder * jokerW + stripGap
     local startX = math.max(0, (C.currentLayout.width - 32 - suitTotal) / 2)
     local jokerStartX = math.max(0, (C.currentLayout.width - 32 - jokerTotal) / 2)
@@ -514,7 +524,7 @@ C.render = function()
   local portrait = aw < ah
   -- 4-player tables stack the partner's play above yours, so both plays and
   -- their tags must fit between the partner panel (~40px) and the trick label.
-  local cardHeight = C.currentLayout.short and 44 or (multiSeat and math.clamp(math.floor(math.min(ah * 0.13, aw * 0.1)), 36, 64) or math.clamp(math.floor(math.min(ah * 0.28, aw * 0.17, (ah - 132) / 2)), 36, 90))
+  local cardHeight = C.currentLayout.short and 44 or (multiSeat and safeClamp(math.floor(math.min(ah * 0.13, aw * 0.1)), 36, 64) or safeClamp(math.floor(math.min(ah * 0.28, aw * 0.17, (ah - 132) / 2)), 36, 90))
   local cardWidth = math.floor(cardHeight * 0.66)
 
   -- Non-overlapping diamond trick layout with ample breathing room

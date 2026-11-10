@@ -1,3 +1,5 @@
+-- Clamp that tolerates max < min (tiny phone screens) instead of erroring.
+local function safeClamp(v, lo, hi) if hi < lo then hi = lo end return math.clamp(v, lo, hi) end
 -- Happy Tractor client, part 1/14: Core.
 -- Lines 1-426 of the original single script. Shared values arrive in
 -- `C`: ones that change at runtime are read as C.name; fixed ones are
@@ -323,7 +325,7 @@ local function playSound(name, pitchVariation, volumeMult)
       local spread = pitchVariation and 8 or 3
       s.PlaybackSpeed = basePitch + (math.random(-spread, spread) / 100)
       -- Volume is always computed from the base, so it never drifts.
-      s.Volume = math.clamp(def[2] * (volumeMult or 1), 0, 1)
+      s.Volume = safeClamp(def[2] * (volumeMult or 1), 0, 1)
       s:Play()
     end
   end)

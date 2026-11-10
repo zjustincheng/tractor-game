@@ -1,3 +1,5 @@
+-- Clamp that tolerates max < min (tiny phone screens) instead of erroring.
+local function safeClamp(v, lo, hi) if hi < lo then hi = lo end return math.clamp(v, lo, hi) end
 -- Happy Tractor client: High Stakes rooms on the tier screen.
 -- A STANDARD / HIGH STAKES switch in the tier screen's bottom bar. In High
 -- Stakes mode the three table cards become High Roller, Whale Room and
@@ -152,7 +154,7 @@ local function applyLooks()
       local barFrame = lock:FindFirstChild('Bar')
       if barFrame then
         local fill, txt = barFrame:FindFirstChild('Fill'), barFrame:FindFirstChild('Text')
-        if fill then fill.Size = UDim2.new(math.clamp(coins / s.min, 0, 1), 0, 1, 0) end
+        if fill then fill.Size = UDim2.new(safeClamp(coins / s.min, 0, 1), 0, 1, 0) end
         if txt then txt.Text = 'Need ' .. short(math.max(0, s.min - coins)) .. ' more  ·  ' .. short(coins) .. ' / ' .. short(s.min) end
       end
     end

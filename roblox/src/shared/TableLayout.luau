@@ -15,7 +15,7 @@ function Layout.calculate(width, height, count)
   local handHeight = rows * (cardHeight + 8) + 24
   local footer = 38
   local handY = height - footer - handHeight
-  local actionY = handY - 76
+  local actionY = handY - 88 -- leaves room for a raised (selected) card under the Play/Clear buttons
   local top = short and 52 or (compact and 96 or 76)
   return { width = width, height = height, compact = compact, short = short, cardWidth = cardWidth,
     cardHeight = cardHeight, rows = rows, columns = columns, step = step,

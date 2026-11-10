@@ -1,3 +1,5 @@
+-- Clamp that tolerates max < min (tiny phone screens) instead of erroring.
+local function safeClamp(v, lo, hi) if hi < lo then hi = lo end return math.clamp(v, lo, hi) end
 -- Happy Tractor client, part 8/14: Modals.
 -- Lines 3168-3979 of the original single script. Shared values arrive in
 -- `C`: ones that change at runtime are read as C.name; fixed ones are
@@ -85,7 +87,7 @@ function arenaUI.initSettingsModal()
 
   local function layoutSettings()
     local w, h = root.AbsoluteSize.X, root.AbsoluteSize.Y
-    local smW = math.clamp(w - 40, 360, 520)
+    local smW = safeClamp(w - 40, 360, 520)
     local smH = 340
     rect(sModal, (w - smW) / 2, (h - smH) / 2, smW, smH)
     rect(sTitle, 20, 14, smW - 70, 26)
@@ -500,8 +502,8 @@ function arenaUI.initRulesModal()
   local nextLesson = button(ruModal, 'NextLesson', 'NEXT LESSON →', function() stepLesson(1) end)
   local function layoutRules()
     local w, h = root.AbsoluteSize.X, root.AbsoluteSize.Y
-    local rmW = math.clamp(w - 40, 420, 620)
-    local rmH = math.clamp(h - 40, 390, 540)
+    local rmW = safeClamp(w - 40, 420, 620)
+    local rmH = safeClamp(h - 40, 390, 540)
     rect(ruModal, (w - rmW) / 2, (h - rmH) / 2, rmW, rmH)
     rect(ruTitle, 20, 14, rmW - 70, 26)
     rect(ruClose, rmW - 44, 12, 32, 32)
@@ -601,7 +603,7 @@ function arenaUI.initMailModal()
 
   local function layoutMail()
     local w, h = root.AbsoluteSize.X, root.AbsoluteSize.Y
-    local mmW = math.clamp(w - 40, 380, 500)
+    local mmW = safeClamp(w - 40, 380, 500)
     local mmH = 290
     rect(mModal, (w - mmW) / 2, (h - mmH) / 2, mmW, mmH)
     rect(mTitle, 20, 14, mmW - 70, 26)
@@ -737,7 +739,7 @@ function arenaUI.initLuckyModal()
 
   local function layoutLucky()
     local w, h = root.AbsoluteSize.X, root.AbsoluteSize.Y
-    local lmW = math.clamp(w - 40, 380, 520)
+    local lmW = safeClamp(w - 40, 380, 520)
     local lmH = 340
     rect(lModal, (w - lmW) / 2, (h - lmH) / 2, lmW, lmH)
     rect(lTitle, 20, 14, lmW - 70, 26)
@@ -799,7 +801,7 @@ function arenaUI.initVaultModal()
 
   local function layoutVault()
     local w, h = root.AbsoluteSize.X, root.AbsoluteSize.Y
-    local vmW = math.clamp(w - 40, 360, 480)
+    local vmW = safeClamp(w - 40, 360, 480)
     local vmH = 280
     rect(vModal, (w - vmW) / 2, (h - vmH) / 2, vmW, vmH)
     rect(vTitle, 20, 14, vmW - 70, 26)

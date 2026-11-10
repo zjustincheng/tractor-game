@@ -435,6 +435,8 @@ last-writer-wins without a session lock). The table-selection screen has a
 
 # Roblox trick coins and Chao Di stakes
 
+Update 2026-11-10: captured-point coins are paid only on rounds the player wins; `roblox/tests/server.lua` asserts this.
+
 On 2026-11-06: captured points now pay coins per trick (10/30/100 per point by
 table) times the Chao Di stake, including the final trick, which previously paid
 nothing. The round multiplier cap rose from ×64 to ×256. `server.lua` checks that

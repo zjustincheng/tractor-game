@@ -36,6 +36,36 @@ local Persistence = require(script.Parent.Persistence)(progressStore, Catalog, f
 end)
 local AUTOSAVE_SECONDS = 60
 
+-- ===== Roblox badges =====
+-- IDs live in Catalog.badges (0 = not created yet, skipped). Each badge is
+-- tried at most once per session per player; Roblox ignores repeats anyway.
+local BadgeService = game:GetService('BadgeService')
+local badgesTried = setmetatable({}, { __mode = 'k' }) -- player -> { key = true }
+-- Analytics (Creator Hub > Analytics): a new-player funnel and a few custom
+-- events. Logging must never interrupt play, so every call is fire-and-forget.
+local AnalyticsService = game:GetService('AnalyticsService')
+local function funnel(player, step, name)
+  task.spawn(pcall, function() AnalyticsService:LogOnboardingFunnelStepEvent(player, step, name) end)
+end
+local function logEvent(player, name, value)
+  task.spawn(pcall, function() AnalyticsService:LogCustomEvent(player, name, value or 1) end)
+end
+local function awardBadge(player, key)
+  local id = Catalog.badges and Catalog.badges[key]
+  if not player or type(id) ~= 'number' or id <= 0 then return end
+  local tried = badgesTried[player]
+  if not tried then tried = {}; badgesTried[player] = tried end
+  if tried[key] then return end
+  tried[key] = true
+  task.spawn(function()
+    local ok, has = pcall(function() return BadgeService:UserHasBadgeAsync(player.UserId, id) end)
+    if ok and has then return end
+    local awarded, err = pcall(function() return BadgeService:AwardBadge(player.UserId, id) end)
+    if not awarded then warn('[Tractor] Badge ' .. key .. ' failed: ' .. tostring(err)) end
+  end)
+end
+local HIGH_STAKES = { highroller = true, whale = true, legend = true }
+
 -- ===== Coin leaderboard (global, all servers) =====
 -- Each save posts the player's coins to an OrderedDataStore; the top 50 are
 -- re-read every 90 seconds and sent to clients that open the leaderboard.
@@ -75,9 +105,42 @@ local function postLeaderScore(player, coins)
   end)
   if not ok then warn('[Tractor] Leaderboard write failed: ' .. tostring(err)) end
 end
+-- ===== Ranked ladder (global, all servers) =====
+-- Rank Points live in each player's saved stats; this store only ranks them.
+local rankStore
+if progressStore then
+  pcall(function() rankStore = game:GetService('DataStoreService'):GetOrderedDataStore('TractorRank_v1') end)
+end
+local rankBoard = { entries = {}, updatedAt = 0 }
+local function rankName(points)
+  local name = 'Bronze'
+  for _, tier in ipairs(Catalog.ranks or {}) do
+    if (points or 0) >= tier.at then name = tier.name end
+  end
+  return name
+end
+local function refreshRankBoard()
+  if not rankStore then return end
+  local ok, pages = pcall(function() return rankStore:GetSortedAsync(false, LEADER_SIZE) end)
+  if not ok then warn('[Tractor] Rank board read failed: ' .. tostring(pages)) return end
+  local list = {}
+  for rank, entry in ipairs(pages:GetCurrentPage()) do
+    local userId = tonumber(entry.key)
+    if userId then table.insert(list, { rank = rank, userId = userId, name = leaderName(userId), points = entry.value, tier = rankName(entry.value) }) end
+  end
+  rankBoard.entries, rankBoard.updatedAt = list, os.time()
+end
+local function postRankScore(player, points)
+  if not rankStore then return end
+  local ok, err = pcall(function()
+    rankStore:SetAsync(tostring(player.UserId), math.floor(math.clamp(points or 0, 0, 9e15)))
+  end)
+  if not ok then warn('[Tractor] Rank board write failed: ' .. tostring(err)) end
+end
 task.spawn(function()
   while true do
     refreshLeaderboard()
+    refreshRankBoard()
     task.wait(90)
   end
 end)
@@ -189,6 +252,7 @@ local function everyoneDoubled(game)
 end
 
 local function send(player, session, message, coinBonus)
+  if (session.coins or 0) >= 1000000 then awardBadge(player, 'millionaire') end
   local earned = Persistence.grantEarned(session)
   if #earned > 0 then
     local names = {}
@@ -250,6 +314,7 @@ local function send(player, session, message, coinBonus)
     coinBonus = coinBonus,
     saving = session.saveStatus,
     stats = session.stats,
+    rejoinOffer = (session.rejoinOffer or 0) > os.time() or nil,
     vip = session.vip == true,
     pass = session.pass,
     markersLeft = Persistence.markersLeft(session),
@@ -303,7 +368,8 @@ local TIER_CONFIG = {
   legend = { name = 'Legend Vault', min = 5000000, max = math.huge, base = 250000, ante = 75000 },
 }
 
--- Coins per captured point at each table; Chao Di multiplies them.
+-- Coins per captured point at each table, paid only on rounds you win; Chao Di
+-- multiplies them.
 local POINT_COINS = { novice = 10, pro = 30, master = 100, highroller = 300, whale = 1200, legend = 5000 }
 
 -- Tallies your team's captured points once per completed trick. The coins are
@@ -671,12 +737,14 @@ local function arriveForMatch(player, session, joinData, now)
   end
   if type(joinData.matchId) ~= 'string' then return false end
   local tbl = matchTables[joinData.matchId]
+  -- A reconnecting player whose match table has since closed has no seat.
+  if tbl and tables[tbl.id] ~= tbl then return false end
   if not tbl then
     local record = crossServer.loadMatch(joinData.matchId)
     if not record then return false end
     nextTableId = nextTableId + 1
     tbl = { id = nextTableId, playerCount = record.playerCount, tier = record.tier, fullMatch = record.fullMatch,
-      private = false, members = {}, serial = 0, expected = record.seats, startAt = now + ARRIVAL_WAIT }
+      private = false, members = {}, serial = 0, expected = record.seats, startAt = now + ARRIVAL_WAIT, matchId = joinData.matchId }
     tables[tbl.id] = tbl
     matchTables[joinData.matchId] = tbl
   end
@@ -700,15 +768,16 @@ local function awardMatchCompletion(player, session, state)
   payTrickCoins(session, state)
   -- What you carried into the round caps what the result can win you.
   local carriedIn = session.coins
-  -- Captured-point coins are paid here, at the round's final Chao Di stake.
-  local roundTrickCoins = (session.matchTrickCoins or 0) * (state.chaodiMultiplier or 1)
-  session.coins = session.coins + roundTrickCoins
 
   local settlement = state.settlement
   local isAttacking = state.attackingTeam == 'A'
   local advancingRole = settlement and settlement.outcome and settlement.outcome.advancingRole
   local advancingTeam = advancingRole and (advancingRole == 'attackers' and state.attackingTeam or (state.attackingTeam == 'A' and 'B' or 'A')) or (isAttacking and 'A' or 'B')
   local userWon = (advancingTeam == 'A')
+
+  -- Captured-point coins are paid only on a win, at the round's final Chao Di stake.
+  local roundTrickCoins = userWon and (session.matchTrickCoins or 0) * (state.chaodiMultiplier or 1) or 0
+  session.coins = session.coins + roundTrickCoins
 
   local defScore = (settlement and settlement.defenderScore) or ((state.points and (state.points[isAttacking and 2 or 1] or 0) or 0) + (state.penaltyPoints or 0))
 
@@ -861,12 +930,50 @@ local function awardMatchCompletion(player, session, state)
   local stats = session.stats
   local function bump(key, amount) stats[key] = (stats[key] or 0) + (amount or 1) end
   bump('roundsPlayed')
+  if stats.roundsPlayed == 1 then funnel(player, 3, 'First round finished') end
+  logEvent(player, 'RoundPlayed_' .. tostring(state.tier or 'unknown'))
+  -- Ranked ladder. RP scales with how decisive the round was (the levels the
+  -- winning team took), so a shutout is worth far more than a squeaker:
+  --   against people   win +30 / +40 / +50    loss -25 / -30 / -35
+  --   against bots     win +15 / +20 / +25    loss -17 / -20 / -23
+  -- Bot tables move it about half as much and are slightly negative at an even
+  -- win rate, so the ladder measures wins against people, not bot grinding.
+  -- Points never drop below 0 and Bronze (under 100) never loses any.
+  do
+    local tbl, vsPeople = session.table, false
+    if tbl then
+      for seat in pairs(tbl.members) do
+        if Cards.team(seat) ~= Cards.team(session.seat) then vsPeople = true end
+      end
+    end
+    local levels = math.clamp((settlement and settlement.outcome and settlement.outcome.levels) or 1, 1, 3)
+    local before = stats.rankPoints or 0
+    local delta
+    if userWon then delta = vsPeople and (20 + 10 * levels) or (10 + 5 * levels)
+    elseif before < 100 then delta = 0
+    else delta = vsPeople and -(20 + 5 * levels) or -(14 + 3 * levels) end
+    stats.rankPoints = math.max(0, before + delta)
+    local change = stats.rankPoints - before
+    if settlement then settlement.rankDelta, settlement.rankPoints, settlement.rankTier = change, stats.rankPoints, rankName(stats.rankPoints) end
+    if change ~= 0 then
+      msg = msg .. string.format(' · Rank %s%d (%s %d RP)', change > 0 and '+' or '', change, rankName(stats.rankPoints), stats.rankPoints)
+    end
+    if rankName(stats.rankPoints) ~= rankName(before) and change > 0 then
+      msg = msg .. ' · Promoted to ' .. rankName(stats.rankPoints) .. '!'
+    end
+  end
+  if HIGH_STAKES[state.tier] then awardBadge(player, 'high_roller') end
   if userWon then
     bump('roundsWon')
+    if stats.roundsWon == 1 then funnel(player, 4, 'First win') end
+    awardBadge(player, 'first_win')
     stats.bestGrade = math.max(stats.bestGrade or 0, totalMultiplier)
   end
   if not state.quickMatch and settlement and settlement.winner == 'A' then bump('matchesWon') end
-  if advancingRole == 'attackers' and isAttacking and defScore <= 0 then bump('shutouts') end
+  if advancingRole == 'attackers' and isAttacking and defScore <= 0 then
+    bump('shutouts')
+    awardBadge(player, 'shutout')
+  end
   if advancingRole == 'defenders' and not isAttacking then bump('overturns') end
   stats.biggestWin = math.max(stats.biggestWin or 0, gained)
   bump('coinsEarned', gained)
@@ -985,6 +1092,32 @@ local function tableTick(tbl, now)
     tbl.nextChaodiAt = nil
   end
 
+  -- Bots with a trump-heavy hand Double too (their own stake only), a moment
+  -- into the window so it reads like a decision.
+  if game.phase == 'doubling' then
+    if not game.botDoubleAt then
+      game.botDoubleAt = {}
+      for seat = 1, game.playerCount or 4 do
+        local hand = game.hands and game.hands[seat]
+        if hand and #hand > 0 and not Practice.isHuman(game, seat) then
+          local trumps = Practice.trumpCount(hand, game.trump.level, game.trump.suit)
+          if trumps >= #hand * 0.42 then game.botDoubleAt[seat] = now + 1 + math.random() * 3 end
+        end
+      end
+    end
+    for seat, at in pairs(game.botDoubleAt) do
+      if now >= at then
+        game.botDoubleAt[seat] = nil
+        if canDouble(game, seat) and not Practice.isHuman(game, seat) then
+          game.doubled = game.doubled or {}
+          game.doubled[seat] = true
+          broadcast(tbl, seatName(tbl, seat) .. ' doubled! ×2 stakes')
+          changed = true
+        end
+      end
+    end
+  end
+
   -- The Double window closes on its timer, or early once every person doubled.
   if game.phase == 'doubling' and Practice.endDoubling(game, now, everyoneDoubled(game)) then
     changed = true
@@ -1036,11 +1169,62 @@ function saveProgress(player, session, force)
       session.leaderCoins = data.coins
       task.spawn(postLeaderScore, player, data.coins)
     end
+    local rankPoints = data.stats and data.stats.rankPoints or 0
+    if rankPoints > 0 and session.leaderRank ~= rankPoints then
+      session.leaderRank = rankPoints
+      task.spawn(postRankScore, player, rankPoints)
+    end
   else
     session.saveStatus = { enabled = false, reason = 'The last save failed. ' .. explainStoreError(err) }
     warn('[Tractor] Could not save progress for ' .. tostring(player.UserId) .. ': ' .. tostring(err))
   end
   return ok
+end
+
+-- ===== Reconnecting =====
+-- Someone who drops out of a round that other people are still playing can
+-- take their seat back (a bot holds it meanwhile) for a few minutes.
+local REJOIN_SECONDS = 240
+local rejoinSeats = {} -- userId -> { tbl, seat, roundKey, expires }
+local function rememberSeat(userId, tbl, seat)
+  rejoinSeats[userId] = { tbl = tbl, seat = seat, roundKey = tbl.roundKey, expires = os.time() + REJOIN_SECONDS }
+  if crossServer then task.spawn(crossServer.rememberSeat, userId, tbl.matchId, REJOIN_SECONDS) end
+end
+local function seatStillOpen(entry)
+  local tbl = entry.tbl
+  return tables[tbl.id] == tbl and tbl.game ~= nil and not tbl.game.done and tbl.roundKey == entry.roundKey
+    and not tbl.members[entry.seat] and os.time() < entry.expires
+end
+local function forgetSeat(userId)
+  rejoinSeats[userId] = nil
+  if crossServer then task.spawn(crossServer.forgetSeat, userId) end
+end
+-- Puts a returning player straight back in their seat. True if it worked.
+local function retakeSeat(player, session)
+  local entry = rejoinSeats[player.UserId]
+  if not (entry and seatStillOpen(entry)) or session.table then return false end
+  forgetSeat(player.UserId)
+  seatAt(player, session, entry.tbl, entry.seat)
+  broadcast(entry.tbl, player.DisplayName .. ' is back at the table.')
+  return true
+end
+-- On joining: offer the seat back if the round is still going, here or in
+-- another server.
+local function offerRejoin(player, session)
+  local entry = rejoinSeats[player.UserId]
+  if entry then
+    if seatStillOpen(entry) then session.rejoinOffer = entry.expires return end
+    rejoinSeats[player.UserId] = nil
+  end
+  if not crossServer then return end
+  task.spawn(function()
+    local record = crossServer.recallSeat(player.UserId)
+    if record and record.jobId ~= game.JobId and sessions[player] == session and not session.table then
+      session.rejoinRemote = record
+      session.rejoinOffer = os.time() + REJOIN_SECONDS
+      send(player, session)
+    end
+  end)
 end
 
 local loading = {} -- player -> true while loading, false if they left meanwhile
@@ -1117,10 +1301,19 @@ local function connect(player)
   coinStat.Value = session.coins
   coinStat.Parent = stats
   stats.Parent = player
+  awardBadge(player, 'welcome')
+  funnel(player, 1, 'Joined')
   task.spawn(refreshVip, player, session)
   local joinData
   pcall(function() joinData = player:GetJoinData().TeleportData end)
-  if arriveForMatch(player, session, joinData, os.clock()) then return end
+  if arriveForMatch(player, session, joinData, os.clock()) then
+    rejoinSeats[player.UserId] = nil
+    if crossServer then task.spawn(crossServer.forgetSeat, player.UserId) end
+    return
+  end
+  -- Came back through a reconnect teleport: sit straight down again.
+  if type(joinData) == 'table' and joinData.rejoin and retakeSeat(player, session) then return end
+  if not isMatchServer then pcall(offerRejoin, player, session) end
   if isMatchServer then
     -- Only matched players belong in a match server.
     send(player, session, 'That match has no seat for you. Returning to the lobby…')
@@ -1136,9 +1329,13 @@ Players.PlayerRemoving:Connect(function(player)
   if session then
     -- Cleanup must never stop the save below.
     local ok, problem = pcall(function()
+      -- Mid-round with other people still playing: keep the seat reclaimable.
+      local tbl, seat = session.table, session.seat
+      local midRound = tbl ~= nil and tbl.game ~= nil and not tbl.game.done and humanCount(tbl) > 1
       cancelSearch(player, session)
       leaveSquad(player, session)
       leaveTable(player, session)
+      if midRound then rememberSeat(player.UserId, tbl, seat) end
     end)
     if not ok then warn('[Tractor] Cleanup on leave failed: ' .. tostring(problem)) end
   end
@@ -1284,7 +1481,7 @@ remote.OnServerEvent:Connect(function(player, action, value, revision)
     local other = member and sessions[member]
     local stats = {}
     if other then
-      for _, key in ipairs({ 'roundsPlayed', 'roundsWon', 'matchesWon', 'shutouts', 'overturns', 'chaodis', 'bestGrade', 'biggestWin' }) do
+      for _, key in ipairs({ 'roundsPlayed', 'roundsWon', 'matchesWon', 'shutouts', 'overturns', 'chaodis', 'bestGrade', 'biggestWin', 'rankPoints' }) do
         stats[key] = other.stats[key] or 0
       end
     end
@@ -1295,6 +1492,35 @@ remote.OnServerEvent:Connect(function(player, action, value, revision)
     })
     return
   end
+  if action == 'rejoin' then
+    session.rejoinOffer = nil
+    if retakeSeat(player, session) then return end
+    local record = session.rejoinRemote
+    session.rejoinRemote = nil
+    rejoinSeats[player.UserId] = nil
+    if record and crossServer and not session.table then
+      if record.matchId then
+        local match = crossServer.loadMatch(record.matchId)
+        if match then
+          send(player, session, 'Returning to your table…')
+          crossServer.travel(match, { player })
+          return
+        end
+      elseif record.jobId then
+        send(player, session, 'Returning to your table…')
+        crossServer.rejoinServer(player, record.jobId)
+        return
+      end
+    end
+    send(player, session, 'That round has already finished.')
+    return
+  end
+  if action == 'rejoin_dismiss' then
+    session.rejoinOffer, session.rejoinRemote = nil, nil
+    forgetSeat(player.UserId)
+    send(player, session)
+    return
+  end
   if action == 'leaderboard' then
     local you
     for _, entry in ipairs(leaderboard.entries) do
@@ -1303,6 +1529,8 @@ remote.OnServerEvent:Connect(function(player, action, value, revision)
     remote:FireClient(player, {
       type = 'leaderboard', entries = leaderboard.entries, updatedAt = leaderboard.updatedAt,
       yourRank = you, yourCoins = session.coins, available = leaderStore ~= nil,
+      rankEntries = rankBoard.entries, yourRankPoints = session.stats.rankPoints or 0,
+      yourRankTier = rankName(session.stats.rankPoints or 0), ranks = Catalog.ranks,
     })
     return
   end
@@ -1310,6 +1538,8 @@ remote.OnServerEvent:Connect(function(player, action, value, revision)
     -- Once ever: finishing (not skipping) the tutorial pays a small welcome bonus.
     if not session.tutorialDone then
       session.tutorialDone = true
+      funnel(player, 2, 'Tutorial closed')
+      logEvent(player, value == 'finished' and 'TutorialFinished' or 'TutorialSkipped')
       if value == 'finished' then
         session.coins = session.coins + 1000
         send(player, session, '🎓 Tutorial complete! +1K Coins', 1000)
@@ -1603,7 +1833,10 @@ remote.OnServerEvent:Connect(function(player, action, value, revision)
     elseif action == 'declare' then accepted, reason = Practice.declare(game, seat, value, now)
     elseif action == 'chaodi' then
       accepted, reason = Practice.chaodi(game, seat, value, now)
-      if accepted then session.stats.chaodis = (session.stats.chaodis or 0) + 1 end
+      if accepted then
+      session.stats.chaodis = (session.stats.chaodis or 0) + 1
+      awardBadge(player, 'chaodi')
+    end
     elseif action == 'chaodi_pass' then accepted, reason = Practice.chaodiPass(game, seat, now)
     else accepted, reason = Practice.bury(game, seat, value, now) end
     if not accepted then send(player, session, reason) return end
@@ -1611,6 +1844,31 @@ remote.OnServerEvent:Connect(function(player, action, value, revision)
     local message = reason
     if not isLive then message = Practice.bots(game) or reason end
     afterChange(tbl, nil, player, message)
+  elseif action == 'forfeit' then
+    -- Concede the round. Every person on the team must agree; bots go along.
+    local tbl = session.table
+    local game = tbl and tbl.game
+    if not game or game.done then return end
+    if game.phase ~= 'tricks' and game.phase ~= 'trick-review' then
+      send(player, session, 'You can concede once play has started.') return
+    end
+    local team = Cards.team(session.seat)
+    game.forfeitVotes = game.forfeitVotes or {}
+    local already = game.forfeitVotes[session.seat]
+    game.forfeitVotes[session.seat] = true
+    local waiting = 0
+    for seat, human in pairs(game.humans or {}) do
+      if human and Cards.team(seat) == team and not game.forfeitVotes[seat] then waiting = waiting + 1 end
+    end
+    if waiting > 0 then
+      if not already then broadcast(tbl, player.DisplayName .. ' wants to concede. Teammates: press Concede to agree.') end
+      return
+    end
+    local ok, reason = Practice.forfeit(game, session.seat, now)
+    if not ok then send(player, session, reason) return end
+    tbl.waitKey = nil
+    logEvent(player, 'Conceded')
+    afterChange(tbl, player.DisplayName .. "'s team conceded the round.", player, 'Your team conceded the round.')
   elseif action == 'double' then
     local tbl = session.table
     local game = tbl and tbl.game

@@ -152,7 +152,8 @@ local function playRound()
   for _, entry in ipairs(latest.game.history) do
     if entry.winnerSeat % 2 == 1 then expectedTrickCoins = expectedTrickCoins + entry.points * perPoint * latest.game.chaodiMultiplier end
   end
-  assert(settlement.trickCoins == expectedTrickCoins, 'Trick coins match captured points × table rate × Chao Di stake')
+  if not settlement.userWon then expectedTrickCoins = 0 end
+  assert(settlement.trickCoins == expectedTrickCoins, 'Trick coins pay captured points × table rate × Chao Di stake, on wins only')
   assert(latest.coins == 50000 + expectedTrickCoins + settlement.netCoins + (settlement.reliefCoins or 0) + (settlement.matchBonus or 0))
   local coins = latest.coins
   if lastId then
