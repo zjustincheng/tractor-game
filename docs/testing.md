@@ -173,6 +173,8 @@ Policy evaluation tests cover promotion with a positive level interval and point
 
 `backend/src/training/roblox-guard.test.ts` covers the Roblox-rules best-learner guard: it needs a full four-generation window, keeps the learner ending the best stretch, ignores ordinary swings, returns after a sustained drop, gives a restored learner a fresh window, and survives checkpoint resume. It replays the real scores from the run that declined at generations 237-245. It does not show that the guard makes a run beat the Roblox bots.
 
+`backend/src/training/roblox-burial.test.ts` covers Roblox-rules burial options, which start from the Roblox bot's burial and leave website burials unchanged, and checks that a Roblox-rules generation skips baseline and Sharp when its Roblox score cannot earn promotion. `roblox/tests/parity.mjs` checks that the in-game Luau burial in `roblox/src/server/TrainedBots.luau` picks the same cards.
+
 # Roblox foundation
 
 `roblox/tests/practice.lua` exercises the native pure Lua-compatible card and

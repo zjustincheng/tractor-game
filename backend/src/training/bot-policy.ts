@@ -16,6 +16,7 @@ export function learnedBotPolicy(
     declaration?: (experience: PolicyExperience) => void;
     burial?: (experience: PolicyExperience) => void;
   } = {},
+  options: { robloxRules?: boolean } = {},
 ): BotPolicy {
   return {
     lead: (hand, trump, context) =>
@@ -49,6 +50,14 @@ export function learnedBotPolicy(
         record.declaration,
       ),
     bury: (cards, size, trump) =>
-      choosePolicyBurial(follow, cards, size, trump, undefined, record.burial),
+      choosePolicyBurial(
+        follow,
+        cards,
+        size,
+        trump,
+        undefined,
+        record.burial,
+        options.robloxRules === true,
+      ),
   };
 }

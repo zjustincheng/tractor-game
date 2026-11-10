@@ -773,7 +773,12 @@ export function trainPolicyGeneration(
     // Sharp plays with its own validated-throw information, exactly as a player
     // meets it in the app. Practice never faces it, which is the point.
     if (pair === 'sharp') return { opponentPolicy: heuristicPolicy('sharp') };
-    const policy = learnedBotPolicy(pair.lead, pair.follow);
+    const policy = learnedBotPolicy(
+      pair.lead,
+      pair.follow,
+      {},
+      { robloxRules: checkpoint.robloxRules === true },
+    );
     return {
       opponentLead: ((hand, trump, context) =>
         policy.lead(hand, trump, context, [])) as NonNullable<
@@ -880,6 +885,7 @@ export function trainPolicyGeneration(
               trump,
               pick,
               (experience) => followExperiences.push(experience),
+              checkpoint.robloxRules === true,
             ),
           ...opponentPolicies(opponent),
           onPosition: (position) => {
@@ -1025,6 +1031,11 @@ export function trainPolicyGeneration(
   // Epoch counts are reported separately; this phase plays no matches.
   onPhase?.('update', performance.now() - updateStarted, 0);
   pending.length = 0;
+  // Whichever validation always runs supplies the behavior statistics.
+  const behaviorPhase =
+    checkpoint.robloxRules === true
+      ? 'validation-roblox'
+      : 'validation-baseline';
   function evaluate(
     opponent: Pair | 'sharp' | 'roblox' | null,
     phase: string,
@@ -1033,17 +1044,22 @@ export function trainPolicyGeneration(
     const started = performance.now();
     const logitSpreads: number[] = [];
     const record = (model: PolicyModel) => (e: PolicyExperience) => {
-      if (phase !== 'validation-baseline' || e.options.length < 2) return;
+      if (phase !== behaviorPhase || e.options.length < 2) return;
       logitSpreads.push(learnedLogitSpread(model, e.options));
       const baseline = e.options.findIndex((o) => o.prior > 0);
       if (baseline < 0) return;
       evaluationBehavior.choices++;
       if (e.chosen !== baseline) evaluationBehavior.differentFromBaseline++;
     };
-    const evaluatedPolicy = learnedBotPolicy(leadLearner, followLearner, {
-      lead: record(leadLearner),
-      follow: record(followLearner),
-    });
+    const evaluatedPolicy = learnedBotPolicy(
+      leadLearner,
+      followLearner,
+      {
+        lead: record(leadLearner),
+        follow: record(followLearner),
+      },
+      { robloxRules: checkpoint.robloxRules === true },
+    );
     const matches: SelfPlayResult[] = [];
     for (const playerCount of checkpoint.config.playerCounts) {
       const seedCount = phase.includes('champion')
@@ -1087,7 +1103,7 @@ export function trainPolicyGeneration(
       generation * 7919 + (confirmation ? 17 : 0),
       phase === 'validation-champion' && !confirmation,
     );
-    if (phase === 'validation-baseline') {
+    if (phase === behaviorPhase) {
       const sorted = [...logitSpreads].sort((a, b) => a - b);
       evaluationLogits.meanSpread = logitSpreads.length
         ? logitSpreads.reduce((sum, value) => sum + value, 0) /
@@ -1101,26 +1117,37 @@ export function trainPolicyGeneration(
     onPhase?.(phase, performance.now() - started, matches.length);
     return evaluation;
   }
-  const vsBaseline = evaluate(null, 'validation-baseline');
+  // A Roblox-rules run plays the Roblox bots first. Baseline and Sharp can only
+  // refuse a promotion, so they wait until this score could earn one.
+  const robloxFirst =
+    checkpoint.robloxRules === true
+      ? evaluate('roblox', 'validation-roblox')
+      : null;
+  const robloxPromising = !robloxFirst || policyPasses(robloxFirst);
+  const vsBaseline = robloxPromising
+    ? evaluate(null, 'validation-baseline')
+    : summarize([]);
   const vsChampion = champion
     ? evaluate(champion, 'validation-champion')
     : vsBaseline;
   // The archive gate can only refuse a promotion the earlier gates already
   // refused, so a failed baseline or champion gate skips those matches.
   const gatesPassed =
-    completed > 0 && policyPasses(vsBaseline) && policyPasses(vsChampion);
+    robloxPromising &&
+    completed > 0 &&
+    policyPasses(vsBaseline) &&
+    policyPasses(vsChampion);
   // Held out: beating Sharp cannot come from having learned this pool's habits,
   // because practice never plays it. Measured only once the cheaper gates pass,
   // so a failing generation pays nothing for it.
   const sharpGate = checkpoint.sharpGate ?? true;
   const vsSharp = gatesPassed ? evaluate('sharp', 'validation-sharp') : null;
   const sharpPassed = !vsSharp || !sharpGate || policyPasses(vsSharp);
-  // A Roblox-rules run always measures this: the guard needs every generation,
-  // above all the ones bad enough to fail the cheaper gates.
   const vsRoblox =
-    checkpoint.robloxRules === true || (gatesPassed && sharpPassed)
+    robloxFirst ??
+    (gatesPassed && sharpPassed
       ? evaluate('roblox', 'validation-roblox')
-      : null;
+      : null);
   const robloxPassed = !vsRoblox || policyPasses(vsRoblox);
   const archived =
     gatesPassed && sharpPassed && robloxPassed

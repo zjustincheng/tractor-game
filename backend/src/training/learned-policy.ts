@@ -12,6 +12,7 @@ import {
   effectivePower,
   teamAt,
 } from '@tractor/rules';
+import { robloxBurial } from './roblox-bot.js';
 import type {
   BotLeadContext,
   BotPlayContext,
@@ -674,6 +675,73 @@ export function choosePolicyDeclaration(
   return choices[chosen]!;
 }
 
+/** Burials offered under the Roblox rules. All of them keep trump and aim to
+ * shorten suits; the Roblox bot's own choice comes first and is the baseline. */
+export function robloxBurialChoices(
+  cards: readonly Card[],
+  size: number,
+  trump: Trump,
+): string[][] {
+  const baseline = robloxBurial(cards, size, trump);
+  const order = robloxBurial(cards, cards.length, trump);
+  const byId = new Map(cards.map((card) => [card.id, card]));
+  // Empty the shortest suits outright, then fall back to the Roblox order.
+  const suits = new Map<string, string[]>();
+  for (const id of order) {
+    const group = category(byId.get(id)!, trump);
+    if (group !== 'trump') suits.set(group, [...(suits.get(group) ?? []), id]);
+  }
+  const voiding: string[] = [];
+  for (const suit of [...suits.values()].sort((a, b) => a.length - b.length))
+    if (voiding.length + suit.length <= size) voiding.push(...suit);
+  for (const id of order)
+    if (voiding.length < size && !voiding.includes(id)) voiding.push(id);
+  // The Roblox order, but point cards go only when nothing else is left.
+  const savingPoints = [...order]
+    .sort(
+      (a, b) =>
+        Number(category(byId.get(a)!, trump) === 'trump') -
+          Number(category(byId.get(b)!, trump) === 'trump') ||
+        Number(cardPoints(byId.get(a)!) > 0) -
+          Number(cardPoints(byId.get(b)!) > 0),
+    )
+    .slice(0, size);
+  return [baseline, voiding, savingPoints];
+}
+/** What a Roblox burial leaves behind, in the slots burial otherwise zeroes. */
+function robloxBurialShape(
+  cards: readonly Card[],
+  selected: readonly Card[],
+  trump: Trump,
+): number[] {
+  const kept = cards.filter((card) => !selected.includes(card));
+  const lengths = (from: readonly Card[]) => {
+    const counts = new Map<string, number>();
+    for (const card of from) {
+      const group = category(card, trump);
+      if (group !== 'trump') counts.set(group, (counts.get(group) ?? 0) + 1);
+    }
+    return counts;
+  };
+  const before = lengths(cards);
+  const after = lengths(kept);
+  const identities = (from: readonly Card[]) => {
+    const counts = new Map<string, number>();
+    for (const card of from)
+      counts.set(cardIdentity(card), (counts.get(cardIdentity(card)) ?? 0) + 1);
+    return counts;
+  };
+  const remaining = identities(kept);
+  const brokenPairs = [...identities(cards)].filter(
+    ([identity, count]) => count >= 2 && (remaining.get(identity) ?? 0) === 1,
+  ).length;
+  return [
+    (before.size - after.size) / 4,
+    brokenPairs / Math.max(1, selected.length),
+    after.size ? Math.min(...after.values()) / 13 : 0,
+  ];
+}
+
 export function choosePolicyBurial(
   model: PolicyModel,
   cards: readonly Card[],
@@ -681,7 +749,49 @@ export function choosePolicyBurial(
   trump: Trump,
   pick?: (max: number) => number,
   record?: (experience: PolicyExperience) => void,
+  robloxRules = false,
 ): string[] {
+  if (robloxRules) {
+    const key = (ids: readonly string[]) => [...ids].sort().join('|');
+    const choices = robloxBurialChoices(cards, size, trump);
+    const options = [
+      ...new Map(choices.map((ids) => [key(ids), ids])).values(),
+    ].map((ids, index) => {
+      const selected = cards.filter((card) => ids.includes(card.id));
+      return {
+        cardIds: ids,
+        prior: index === 0 ? BASELINE_PRIOR : 0,
+        features: [
+          0,
+          cards.length / 30,
+          Number(selected.some((card) => category(card, trump) === 'trump')),
+          selected.reduce((sum, card) => sum + cardPoints(card), 0) / 50,
+          selected.reduce((sum, card) => sum + effectivePower(card, trump), 0) /
+            100,
+          selected.filter((card) => card.kind === 'joker').length / 2,
+          Number(selected.some((card) => card.kind === 'joker')),
+          ...robloxBurialShape(cards, selected, trump),
+          ...Array<number>(13).fill(0),
+        ],
+      };
+    });
+    const temperature = pick ? EXPLORATION_TEMPERATURE : 1;
+    const probabilities = policyProbabilities(model, options, temperature);
+    let chosen = probabilities.indexOf(Math.max(...probabilities));
+    if (pick) {
+      const draw = pick(0x100000000) / 0x100000000;
+      let sum = 0;
+      for (let index = 0; index < probabilities.length; index++) {
+        sum += probabilities[index]!;
+        if (draw < sum) {
+          chosen = index;
+          break;
+        }
+      }
+    }
+    record?.({ options, chosen, temperature });
+    return options[chosen]!.cardIds;
+  }
   const baseline = chooseBotBurial(cards, size, trump);
   const pointSaving = cards
     .slice()

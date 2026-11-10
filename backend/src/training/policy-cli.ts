@@ -205,7 +205,7 @@ function main(): void {
     save();
     const report = checkpoint.reports.at(-1)!;
     console.log(
-      `Generation ${checkpoint.generation}: learned from ${report.decisions} sampled decisions across ${report.learningRounds} rounds (${report.alternativeChoices} alternatives); baseline ${report.vsBaseline.wins}/${report.vsBaseline.games}, champion ${report.vsChampion.wins}/${report.vsChampion.games}; ${report.promoted ? 'champion promoted' : 'learner saved; champion unchanged'}`,
+      `Generation ${checkpoint.generation}: learned from ${report.decisions} sampled decisions across ${report.learningRounds} rounds (${report.alternativeChoices} alternatives); ${report.vsBaseline.games ? `baseline ${report.vsBaseline.wins}/${report.vsBaseline.games}, champion ${report.vsChampion.wins}/${report.vsChampion.games}` : 'baseline and Sharp skipped'}; ${report.promoted ? 'champion promoted' : 'learner saved; champion unchanged'}`,
     );
     if (report.generationsSincePromotion)
       console.log(
