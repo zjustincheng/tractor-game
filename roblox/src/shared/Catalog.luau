@@ -56,6 +56,21 @@ return {
     { id = 'banner_ember', label = 'Red Ember', category = 'banner', price = 20000, colors = { { 225, 60, 50 }, { 70, 10, 30 } } },
     { id = 'banner_galaxy', label = 'Night Galaxy', category = 'banner', price = 50000, colors = { { 120, 70, 230 }, { 12, 12, 50 } } },
 
+    -- Ranked season rewards (see Catalog.rankSeason.rewards): only obtainable
+    -- by reaching that tier in a season.
+    { id = 'frame_rank_bronze', label = 'Bronze Ranked', category = 'frame', rank = 'Bronze', ring = { { 205, 127, 50 }, { 92, 52, 22 } }, glyph = '🥉' },
+    { id = 'frame_rank_silver', label = 'Silver Ranked', category = 'frame', rank = 'Silver', ring = { { 210, 220, 235 }, { 90, 104, 130 } }, glyph = '🥈' },
+    { id = 'frame_rank_gold', label = 'Gold Ranked', category = 'frame', rank = 'Gold', ring = { { 255, 210, 70 }, { 160, 100, 12 } }, glyph = '🥇' },
+    { id = 'frame_rank_platinum', label = 'Platinum Ranked', category = 'frame', rank = 'Platinum', ring = { { 90, 225, 210 }, { 16, 96, 108 } }, glyph = '💠', spin = true },
+    { id = 'frame_rank_diamond', label = 'Diamond Ranked', category = 'frame', rank = 'Diamond', ring = { { 120, 190, 255 }, { 30, 56, 170 } }, glyph = '💎', spin = true },
+    { id = 'frame_rank_master', label = 'Master Crown', category = 'frame', rank = 'Master', ring = { { 230, 110, 245 }, { 92, 20, 130 } }, glyph = '👑', spin = true },
+    { id = 'title_rank_bronze', label = 'Bronze Contender', category = 'title', rank = 'Bronze', color = { 215, 145, 80 } },
+    { id = 'title_rank_silver', label = 'Silver Contender', category = 'title', rank = 'Silver', color = { 200, 210, 228 } },
+    { id = 'title_rank_gold', label = 'Gold Contender', category = 'title', rank = 'Gold', color = { 255, 205, 70 } },
+    { id = 'title_rank_platinum', label = 'Platinum Ace', category = 'title', rank = 'Platinum', color = { 90, 225, 210 } },
+    { id = 'title_rank_diamond', label = 'Diamond Ace', category = 'title', rank = 'Diamond', color = { 120, 190, 255 } },
+    { id = 'title_rank_master', label = 'Ranked Master', category = 'title', rank = 'Master', color = { 230, 120, 245 } },
+
     -- Battle Pass exclusives: only obtainable by claiming that tier.
     { id = 'title_lantern', label = 'Lantern Keeper', category = 'title', pass = true, color = { 255, 190, 110 } },
     { id = 'banner_lantern', label = 'Lantern Festival', category = 'banner', pass = true, colors = { { 240, 120, 60 }, { 120, 24, 40 } } },
@@ -73,12 +88,39 @@ return {
   -- (Trimmed so free coins don't undercut the Robux packs: ~63K per week.)
   loginStreak = { 3000, 4000, 5000, 6000, 7000, 8000, 30000 },
 
-  -- Ranked ladder: Rank Points (RP) needed to reach each tier. A win earns RP
+  -- Ranked seasons: 30 days each from Season 1's start (2026-11-10 UTC). Every
+  -- player's Rank Points go back to 0 when a new season begins.
+  -- When a season ends, players get the coins of the best division they
+  -- reached that season, plus the frame and title of that tier and every tier
+  -- below. Coins climb a little with each division and steeply toward Master.
+  rankSeason = { start = 1794268800, days = 30,
+    stepCoins = {
+      10000, 15000, 25000, -- Bronze III, II, I
+      40000, 60000, 85000, -- Silver III, II, I
+      125000, 175000, 250000, -- Gold III, II, I
+      350000, 475000, 650000, -- Platinum III, II, I
+      900000, 1250000, 1750000, -- Diamond III, II, I
+      2500000, -- Master
+    },
+    rewards = {
+      Bronze = { frame = 'frame_rank_bronze', title = 'title_rank_bronze' },
+      Silver = { frame = 'frame_rank_silver', title = 'title_rank_silver' },
+      Gold = { frame = 'frame_rank_gold', title = 'title_rank_gold' },
+      Platinum = { frame = 'frame_rank_platinum', title = 'title_rank_platinum' },
+      Diamond = { frame = 'frame_rank_diamond', title = 'title_rank_diamond' },
+      Master = { frame = 'frame_rank_master', title = 'title_rank_master' },
+    },
+  },
+
+  -- Ranked ladder: Rank Points (RP) needed to reach each tier (each tier below
+  -- Master splits into three divisions; see Scoring.rankStanding). A win earns RP
   -- and a loss costs some (more against people than against bots); Bronze
   -- players never lose RP. The amounts are in the server's settlement code.
+  -- 1,200 RP per tier, so each of its three divisions is 400 RP: about five
+  -- games for a typical player (see Scoring.rankDelta).
   ranks = {
-    { name = 'Bronze', at = 0 }, { name = 'Silver', at = 100 }, { name = 'Gold', at = 250 },
-    { name = 'Platinum', at = 450 }, { name = 'Diamond', at = 700 }, { name = 'Master', at = 1000 },
+    { name = 'Bronze', at = 0 }, { name = 'Silver', at = 1200 }, { name = 'Gold', at = 2400 },
+    { name = 'Platinum', at = 3600 }, { name = 'Diamond', at = 4800 }, { name = 'Master', at = 6000 },
   },
 
   -- Roblox badges: paste each Badge ID from Creator Hub (Engagement > Badges).

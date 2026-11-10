@@ -170,6 +170,8 @@ local function updateTile(tile)
   elseif item.unlock then
     local have = (s.stats and s.stats[item.unlock.stat]) or 0
     tile.mode, tint, label = 'none', color(50, 54, 82), '🔒 ' .. item.unlock.label .. ' ' .. math.min(have, item.unlock.at) .. '/' .. item.unlock.at
+  elseif item.rank then
+    tile.mode, tint, label = 'none', color(50, 54, 82), '🏆 REACH ' .. string.upper(item.rank) .. ' IN A SEASON'
   elseif item.vip then
     tile.mode, tint, label = 'none', color(50, 54, 82), '🔒 VIP ONLY'
   elseif item.pass then
@@ -342,6 +344,12 @@ function C.applySeatCosmetics(s, info)
   local isDefaultTitle = not title or info.title == SLOT_DEFAULT.title
   s.titleText = (not isDefaultTitle) and title.label or nil
   s.titleColor = (not isDefaultTitle) and rgb(title.color) or nil
+  -- At Ranked tables the title line shows the player's tier instead.
+  if info.rankTier then
+    local colors = C.arenaUI and C.arenaUI.rankColors and C.arenaUI.rankColors[string.match(info.rankTier, '^%a+')]
+    s.titleText = '★ ' .. string.upper(info.rankTier)
+    s.titleColor = colors and colors[1] or s.titleColor
+  end
   local paint = s.cardBg and s.cardBg:FindFirstChildOfClass('UIGradient')
   if paint then
     local banner = info.banner ~= SLOT_DEFAULT.banner and byId[info.banner]

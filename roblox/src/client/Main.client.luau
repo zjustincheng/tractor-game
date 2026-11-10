@@ -38,6 +38,7 @@ for _, name in ipairs({
   'BattlePass',     -- seasonal XP, free and premium reward tracks
   'Forfeit',        -- Concede button in the footer during play
   'Rejoin',         -- banner offering your seat back after a disconnect
+  'RankUp',         -- medal pop-up when a Ranked round promotes you
 }) do
   require(ui:WaitForChild(name))(C)
 end

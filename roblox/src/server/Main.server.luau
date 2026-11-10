@@ -107,13 +107,57 @@ local function postLeaderScore(player, coins)
 end
 -- ===== Ranked ladder (global, all servers) =====
 -- Rank Points live in each player's saved stats; this store only ranks them.
-local rankStore
-if progressStore then
-  pcall(function() rankStore = game:GetService('DataStoreService'):GetOrderedDataStore('TractorRank_v1') end)
+-- Each season has its own board, so a new season starts empty.
+local function currentSeason()
+  return Scoring.rankSeason(os.time(), Catalog.rankSeason or { start = 0, days = 30 })
+end
+local rankStores = {}
+local function seasonRankStore()
+  if not progressStore then return nil end
+  local season = currentSeason()
+  if rankStores[season] == nil then
+    local ok, store = pcall(function() return game:GetService('DataStoreService'):GetOrderedDataStore('TractorRank_s' .. season) end)
+    rankStores[season] = ok and store or false
+  end
+  return rankStores[season] or nil
+end
+-- A player whose points belong to an earlier season starts this one at 0,
+-- first collecting the coins of their best division and the frame and title
+-- of every tier they reached. Returns a message when rewards were paid.
+local function syncSeason(session)
+  local stats = session.stats
+  if not stats then return nil end
+  local season = currentSeason()
+  if (stats.rankSeason or 0) == season then return nil end
+  local note
+  local ranks = Catalog.ranks or {}
+  local peak = math.min(stats.rankPeak or 0, (#ranks - 1) * 3 + 1)
+  local config = Catalog.rankSeason or {}
+  if (stats.rankSeason or 0) > 0 and peak > 0 and session.owned then
+    local coins, items = (config.stepCoins or {})[peak] or 0, {}
+    for index = 1, math.min(#ranks, math.ceil(peak / 3)) do
+      local reward = (config.rewards or {})[ranks[index].name] or {}
+      for _, id in ipairs({ reward.frame, reward.title }) do
+        if not session.owned[id] then
+          session.owned[id] = true
+          for _, item in ipairs(Catalog.profile or {}) do if item.id == id then table.insert(items, item.label) end end
+        end
+      end
+    end
+    session.coins = (session.coins or 0) + coins
+    local paid = {}
+    if coins > 0 then table.insert(paid, coins .. ' coins') end
+    for _, label in ipairs(items) do table.insert(paid, label) end
+    note = '🏆 Season ' .. stats.rankSeason .. ' ended at ' .. Scoring.rankStepLabel(peak, ranks) .. (#paid > 0 and (': ' .. table.concat(paid, ', ')) or '') .. '.'
+  end
+  stats.rankPoints, stats.rankSeason, stats.rankPeak = 0, season, 0
+  return note
 end
 local rankBoard = { entries = {}, updatedAt = 0 }
 -- Bot-only Ranked games stop moving your points once you reach Gold.
-local BOT_RANK_CAP = 250
+local BOT_RANK_CAP = ((Catalog.ranks or {})[3] or { at = 250 }).at
+-- Bronze players never lose points.
+local BRONZE_SAFE_BELOW = ((Catalog.ranks or {})[2] or { at = 100 }).at
 -- Position of a player's tier in Catalog.ranks (1 = Bronze), for matchmaking.
 local function rankIndex(points)
   local index = 1
@@ -122,14 +166,12 @@ local function rankIndex(points)
   end
   return index
 end
+-- The tier and division shown to players, e.g. 'Gold II' or 'Master'.
 local function rankName(points)
-  local name = 'Bronze'
-  for _, tier in ipairs(Catalog.ranks or {}) do
-    if (points or 0) >= tier.at then name = tier.name end
-  end
-  return name
+  return Scoring.rankStanding(points, Catalog.ranks or {}).label
 end
 local function refreshRankBoard()
+  local rankStore = seasonRankStore()
   if not rankStore then return end
   local ok, pages = pcall(function() return rankStore:GetSortedAsync(false, LEADER_SIZE) end)
   if not ok then warn('[Tractor] Rank board read failed: ' .. tostring(pages)) return end
@@ -141,6 +183,7 @@ local function refreshRankBoard()
   rankBoard.entries, rankBoard.updatedAt = list, os.time()
 end
 local function postRankScore(player, points)
+  local rankStore = seasonRankStore()
   if not rankStore then return end
   local ok, err = pcall(function()
     rankStore:SetAsync(tostring(player.UserId), math.floor(math.clamp(points or 0, 0, 9e15)))
@@ -237,6 +280,9 @@ local function tableView(tbl, viewer)
       frame = member and sessions[member] and sessions[member].equipped.frame or nil,
       title = member and sessions[member] and sessions[member].equipped.title or nil,
       banner = member and sessions[member] and sessions[member].equipped.banner or nil,
+      -- Ranked tables show each person's tier by their name.
+      rankTier = tbl.ranked and member and sessions[member] and sessions[member].stats
+        and rankName(sessions[member].stats.rankPoints) or nil,
     }
   end
   return {
@@ -265,6 +311,8 @@ local function everyoneDoubled(game)
 end
 
 local function send(player, session, message, coinBonus)
+  local seasonNote = syncSeason(session)
+  if seasonNote then message = message and (message .. ' · ' .. seasonNote) or seasonNote end
   if (session.coins or 0) >= 1000000 then awardBadge(player, 'millionaire') end
   local earned = Persistence.grantEarned(session)
   if #earned > 0 then
@@ -331,6 +379,8 @@ local function send(player, session, message, coinBonus)
     vip = session.vip == true,
     rankPoints = session.stats and session.stats.rankPoints or 0,
     rankTier = rankName(session.stats and session.stats.rankPoints or 0),
+    rankSeason = currentSeason(),
+    rankSeasonDaysLeft = math.max(1, math.ceil((select(2, currentSeason()) - os.time()) / 86400)),
     pass = session.pass,
     markersLeft = Persistence.markersLeft(session),
     serverTime = os.clock(),
@@ -967,9 +1017,12 @@ local function awardMatchCompletion(player, session, state)
     for seat in pairs(rankedTable.members) do
       if Cards.team(seat) ~= Cards.team(session.seat) then vsPeople = true end
     end
+    syncSeason(session)
     local before = stats.rankPoints or 0
-    local delta, botCapped = Scoring.rankDelta(before, userWon, vsPeople, gradeMultiplier, BOT_RANK_CAP)
+    local delta, botCapped = Scoring.rankDelta(before, userWon, vsPeople, gradeMultiplier, BOT_RANK_CAP, BRONZE_SAFE_BELOW)
     stats.rankPoints = math.max(0, before + delta)
+    -- Your best tier this season decides its rewards (Bronze for playing at all).
+    stats.rankPeak = math.max(stats.rankPeak or 0, Scoring.rankStanding(stats.rankPoints, Catalog.ranks or {}).step)
     local change = stats.rankPoints - before
     if settlement then
       settlement.rankDelta, settlement.rankPoints, settlement.rankTier = change, stats.rankPoints, rankName(stats.rankPoints)
@@ -980,6 +1033,7 @@ local function awardMatchCompletion(player, session, state)
     end
     if rankName(stats.rankPoints) ~= rankName(before) and change > 0 then
       msg = msg .. ' · Promoted to ' .. rankName(stats.rankPoints) .. '!'
+      if settlement then settlement.rankPromoted = rankName(stats.rankPoints) end
     end
   end
   if HIGH_STAKES[state.tier] then awardBadge(player, 'high_roller') end
@@ -1560,7 +1614,7 @@ remote.OnServerEvent:Connect(function(player, action, value, revision)
       type = 'leaderboard', entries = leaderboard.entries, updatedAt = leaderboard.updatedAt,
       yourRank = you, yourCoins = session.coins, available = leaderStore ~= nil,
       rankEntries = rankBoard.entries, yourRankPoints = session.stats.rankPoints or 0,
-      yourRankTier = rankName(session.stats.rankPoints or 0), ranks = Catalog.ranks,
+      yourRankTier = rankName(session.stats.rankPoints or 0), ranks = Catalog.ranks, rankSeason = currentSeason(),
     })
     return
   end

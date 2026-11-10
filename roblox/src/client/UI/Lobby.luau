@@ -384,6 +384,10 @@ home.rankName.Font = Enum.Font.FredokaOne
 home.rankName.TextXAlignment = Enum.TextXAlignment.Left
 home.rankName.TextStrokeTransparency = 0.2
 home.rankName.TextStrokeColor3 = palette.darkStroke
+home.rankSeasonLabel = label(home.rankCard, 'Season', '', 10, palette.white)
+home.rankSeasonLabel.Font = Enum.Font.GothamBold
+home.rankSeasonLabel.TextXAlignment = Enum.TextXAlignment.Right
+home.rankSeasonLabel.TextTransparency = 0.15
 home.rankProgress = label(home.rankCard, 'Progress', '', 12, palette.white)
 home.rankProgress.Font = Enum.Font.GothamBold
 home.rankProgress.TextXAlignment = Enum.TextXAlignment.Left
@@ -399,20 +403,20 @@ local RANK_COLORS = {
   Diamond = { color(90, 165, 255), color(30, 56, 170), color(30, 70, 190) },
   Master = { color(214, 80, 235), color(92, 20, 130), color(120, 30, 160) },
 }
+arenaUI.rankColors = RANK_COLORS
 function arenaUI.renderRankCard(show)
   home.rankCard.Visible = show
   if not show then return end
   local points = C.state and C.state.rankPoints or 0
-  local current, nextTier = { name = 'Bronze', at = 0 }, nil
-  for _, tier in ipairs(C.Catalog.ranks or {}) do
-    if points >= tier.at then current = tier elseif not nextTier then nextTier = tier end
-  end
-  local colors = RANK_COLORS[current.name] or RANK_COLORS.Bronze
+  local standing = arenaUI.Scoring.rankStanding(points, C.Catalog.ranks or {})
+  local colors = RANK_COLORS[standing.tier] or RANK_COLORS.Bronze
   home.rankCard.Gradient.Color = ColorSequence.new(colors[1], colors[2])
   home.rankStar.TextColor3 = colors[3]
-  home.rankName.Text = string.upper(current.name)
-  home.rankProgress.Text = nextTier and (points .. ' / ' .. nextTier.at .. ' RP') or (points .. ' RP · TOP TIER')
-  local share = nextTier and (points - current.at) / (nextTier.at - current.at) or 1
+  home.rankName.Text = string.upper(standing.label)
+  local state = C.state or {}
+  home.rankSeasonLabel.Text = state.rankSeason and ('SEASON ' .. state.rankSeason .. ' · ' .. (state.rankSeasonDaysLeft or '?') .. 'D LEFT') or ''
+  home.rankProgress.Text = standing.nextAt and (points .. ' / ' .. standing.nextAt .. ' RP') or (points .. ' RP · TOP TIER')
+  local share = standing.nextAt and (points - standing.floor) / (standing.nextAt - standing.floor) or 1
   home.rankFill.Size = UDim2.fromScale(math.clamp(share, 0.03, 1), 1)
 end
 home.lobbyHeading = label(home.heroCard, 'LobbyHeading', 'PUBLIC LOBBIES', 13, palette.goldBright)
@@ -452,6 +456,7 @@ function arenaUI.layoutHeroCard(w, h)
   rect(home.rankMedal, 12, 15, 56, 56)
   rect(home.rankName, 78, 8, cardW - 86, 36)
   rect(home.rankProgress, 78, 44, cardW - 86, 16)
+  rect(home.rankSeasonLabel, cardW - 150, 47, 140, 12)
   rect(home.rankBar, 78, 63, cardW - 92, 10)
   rect(home.friendsBtn, 8, h - 40, w - 16, 32)
   arenaUI.placeLobbyList(C.playFor == 'rank')

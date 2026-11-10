@@ -15,8 +15,9 @@ local seen = {}
 for _, item in ipairs(Catalog) do seen[item.id] = true end
 for _, item in ipairs(Catalog.profile) do
   assert(not seen[item.id], 'duplicate id ' .. item.id); seen[item.id] = true
-  local ways = (item.starter and 1 or 0) + (item.price and 1 or 0) + (item.unlock and 1 or 0) + (item.vip and 1 or 0) + (item.pass and 1 or 0)
+  local ways = (item.starter and 1 or 0) + (item.price and 1 or 0) + (item.unlock and 1 or 0) + (item.vip and 1 or 0) + (item.pass and 1 or 0) + (item.rank and 1 or 0)
   assert(ways == 1, item.id .. ' must have one way to obtain it')
+  if item.rank then assert(Catalog.rankSeason.rewards[item.rank][item.category] == item.id, item.id .. ' is a season reward') end
   if item.category == 'frame' and item.id ~= 'frame_none' then assert(item.ring and #item.ring == 2, item.id) end
   if item.category == 'title' then assert(item.color and #item.color == 3, item.id) end
   if item.category == 'banner' then assert(item.colors and #item.colors == 2, item.id) end

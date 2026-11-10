@@ -6,7 +6,9 @@ return function(Cards, S, Rules, Scoring, Trained)
   local function useTrained(state, seat)
     if not Trained then return false end
     if state.trainedSeats then return state.trainedSeats[seat] == true end
-    return state.playerCount == 4
+    -- Trained at four players; it also beats the built-in bots at six
+    -- (58% of rounds) but not at eight or ten, so those keep the old bots.
+    return state.playerCount == 4 or state.playerCount == 6
   end
   local function trained(choose, ...)
     local ok, result = pcall(choose, ...)

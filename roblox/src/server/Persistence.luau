@@ -22,7 +22,7 @@ return function(store, catalog, wait)
   -- Equipment slot for each category that can be worn (slot names match categories).
   local SLOTS = { cardBack = 'cardBack', felt = 'felt', frame = 'frame', title = 'title', banner = 'banner' }
   -- Lifetime counters shown on the stats screen.
-  Persistence.STAT_KEYS = { 'roundsPlayed', 'roundsWon', 'matchesWon', 'shutouts', 'overturns', 'chaodis', 'bestGrade', 'biggestWin', 'coinsEarned', 'rankPoints' }
+  Persistence.STAT_KEYS = { 'roundsPlayed', 'roundsWon', 'matchesWon', 'shutouts', 'overturns', 'chaodis', 'bestGrade', 'biggestWin', 'coinsEarned', 'rankPoints', 'rankSeason', 'rankPeak' }
 
   function Persistence.key(userId) return 'player_' .. tostring(userId) end
   function Persistence.today(now) return math.floor((now or os.time()) / 86400) end

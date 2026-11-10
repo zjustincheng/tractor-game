@@ -59,11 +59,15 @@ end)
 assert(state.done and calls.lead>0 and calls.play>calls.lead and calls.burial>=1 and warnings==0)
 assert(calls.lead+calls.play>=#state.history*4,'Every trained seat decides with the model')
 
--- It was only trained at four players, so larger tables keep the old bots.
-for _,count in ipairs({6,8,10}) do
+-- Trained at four players and better than the old bots at six; eight and ten
+-- keep the old bots.
+local six,six_calls=instrumented()
+assert(playRound(practiceWith(six),6,5,nil).done)
+assert(six_calls.lead>0 and six_calls.play>0,'6-player tables use the trained model')
+for _,count in ipairs({8,10}) do
   local larger,larger_calls=instrumented()
   assert(playRound(practiceWith(larger),count,5,nil).done)
-  assert(larger_calls.lead==0 and larger_calls.play==0 and larger_calls.burial==0 and larger_calls.declaration==0,'Only 4-player tables use the trained model')
+  assert(larger_calls.lead==0 and larger_calls.play==0 and larger_calls.burial==0 and larger_calls.declaration==0,'Only 4- and 6-player tables use the trained model')
 end
 
 -- Without the module (and for seats in an override) the old bots still play.
@@ -79,4 +83,4 @@ local illegal,illegal_calls=instrumented(function(name,...)
 end)
 warnings=0
 assert(playRound(practiceWith(illegal),4,17,nil).done and illegal_calls.play>0 and warnings>0,'An illegal choice falls back to heuristics')
-print('PASS: trained bots: 4-player only, public context, every decision type, crash and illegal-move fallback')
+print('PASS: trained bots: 4- and 6-player tables, public context, every decision type, crash and illegal-move fallback')

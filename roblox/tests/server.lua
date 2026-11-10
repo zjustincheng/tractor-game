@@ -312,4 +312,23 @@ for _, score in ipairs({ 80, 119, 120, 160, 200, 240, 280 }) do table.insert(gra
 assert(table.concat(grades, ',') == '1,1,2,3,4,5,6', table.concat(grades, ','))
 assert(Scoring.payoutGrade('defenders', 180, 6) == 2, 'Six players step every 60 past 120')
 assert(Scoring.payoutGrade('attackers', 0, 4) == 4 and Scoring.payoutGrade('attackers', 30, 4) == 2 and Scoring.payoutGrade('attackers', 60, 4) == 1)
-print('PASS: real command handler with service doubles: stale commands, Chao Di, settlement, replay safety, full-match rounds, purchases, cooldown, saved progress, daily limit, data sanitizing, load-failure safety, end-of-round point coins, open-ended payout grades, reaction broadcasts and saved stats')
+-- A finished Ranked season pays every tier reached, once, and starts the
+-- next season at 0. Gold I pays its coins plus the frames and titles of Bronze, Silver and Gold.
+do
+  local start = Catalog.rankSeason.start
+  Catalog.rankSeason.start = os.time() - 31 * 86400 -- Season 2 is now running
+  if not _G.sessions[player] then players.PlayerAdded.handler(player); command('sync') end
+  local s = _G.sessions[player]
+  s.stats.rankSeason, s.stats.rankPeak, s.stats.rankPoints = 1, 9, 400 -- best: Gold I
+  s.owned.title_rank_gold, s.owned.frame_rank_gold = nil, nil
+  local coins = s.coins
+  command('sync')
+  assert(latest.message and latest.message:find('Season 1 ended at Gold I'), 'The player is told about season rewards')
+  assert(s.coins == coins + 250000 and s.owned.title_rank_gold and s.owned.frame_rank_gold and s.owned.frame_rank_bronze and s.owned.title_rank_silver
+    and not s.owned.frame_rank_platinum, 'Every tier up to Gold pays its coins, frame and title')
+  assert(s.stats.rankPoints == 0 and s.stats.rankSeason == 2 and s.stats.rankPeak == 0)
+  command('sync')
+  assert(s.coins == coins + 250000 and not (latest.message or ''):find('Season 1 ended'), 'Rewards are paid once')
+  Catalog.rankSeason.start = start
+end
+print('PASS: real command handler with service doubles: season rewards, stale commands, Chao Di, settlement, replay safety, full-match rounds, purchases, cooldown, saved progress, daily limit, data sanitizing, load-failure safety, end-of-round point coins, open-ended payout grades, reaction broadcasts and saved stats')
