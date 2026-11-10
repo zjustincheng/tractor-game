@@ -219,6 +219,12 @@ function main(): void {
       console.log(
         `Learner reset to champion after pooled level-margin evidence showed a material regression; Adam moments reset`,
       );
+    if (report.robloxGuard)
+      console.log(
+        report.robloxGuard.returnedToBest
+          ? `Roblox guard: learner returned to generation ${report.robloxGuard.bestGeneration} after a sustained drop; Adam moments reset`
+          : `Roblox guard: recent ${report.robloxGuard.recentWinRate?.toFixed(3) ?? 'filling'}, best ${report.robloxGuard.bestWinRate?.toFixed(3) ?? 'none'} at generation ${report.robloxGuard.bestGeneration ?? 'none'}`,
+      );
     if (report.rollbackCooldown)
       console.log(
         `Rollback held off for ${report.rollbackCooldown} more generation(s) so the learner can recover its step sizes`,

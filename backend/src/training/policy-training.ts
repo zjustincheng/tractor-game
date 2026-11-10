@@ -53,6 +53,13 @@ export interface PolicyReport {
   vsSharp?: Evaluation | null;
   /** The Roblox game's built-in bots, which the champion will replace. */
   vsRoblox?: Evaluation | null;
+  /** Set on Roblox-rules generations that have no champion to fall back on. */
+  robloxGuard?: {
+    recentWinRate: number | null;
+    bestWinRate: number | null;
+    bestGeneration: number | null;
+    returnedToBest: boolean;
+  };
   promoted: boolean;
   learnerReset?: boolean;
   /** Generations left before another rollback may fire, after this one. */
@@ -114,6 +121,79 @@ export function shouldRollbackLearner(
     bootstrapMarginInterval(championMargins, 0x51f15e).high <
       -MIN_CHAMPION_REGRESSION_MARGIN
   );
+}
+/** Roblox bot scores swing by about 20 wins in 256 from one generation to the
+ * next, so the learner is judged on an average of this many generations. */
+export const ROBLOX_GUARD_WINDOW = 4;
+/** Average win rate lost against the best stretch before the learner returns
+ * to it. Six points is about 15 wins in 256. */
+export const ROBLOX_GUARD_DROP = 0.06;
+export interface RobloxGuard {
+  recent: number[];
+  best: {
+    generation: number;
+    winRate: number;
+    lead: PolicyModel;
+    follow: PolicyModel;
+  } | null;
+}
+/** A champion gives the learner something to roll back to. Until one exists,
+ * this keeps the learner from the end of its best stretch against the Roblox
+ * bots and returns to it after a sustained drop. Clearing the window also
+ * leaves the restored learner a full window before it can be judged again. */
+export function resolveRobloxGuard(options: {
+  guard: RobloxGuard | undefined;
+  winRate: number;
+  generation: number;
+  evaluated: PolicyModelPair;
+}): { guard: RobloxGuard; returnTo: PolicyModelPair | null } {
+  const best = options.guard?.best ?? null;
+  const recent = [...(options.guard?.recent ?? []), options.winRate].slice(
+    -ROBLOX_GUARD_WINDOW,
+  );
+  if (recent.length < ROBLOX_GUARD_WINDOW)
+    return { guard: { recent, best }, returnTo: null };
+  const average = recent.reduce((sum, value) => sum + value, 0) / recent.length;
+  if (!best || average > best.winRate)
+    return {
+      guard: {
+        recent,
+        best: {
+          generation: options.generation,
+          winRate: average,
+          lead: parsePolicy(options.evaluated.lead),
+          follow: parsePolicy(options.evaluated.follow),
+        },
+      },
+      returnTo: null,
+    };
+  if (average < best.winRate - ROBLOX_GUARD_DROP)
+    return {
+      guard: { recent: [], best },
+      returnTo: {
+        lead: parsePolicy(best.lead),
+        follow: parsePolicy(best.follow),
+      },
+    };
+  return { guard: { recent, best }, returnTo: null };
+}
+function parseRobloxGuard(guard: RobloxGuard): RobloxGuard {
+  if (
+    !Array.isArray(guard.recent) ||
+    guard.recent.length > ROBLOX_GUARD_WINDOW ||
+    guard.recent.some((value) => typeof value !== 'number') ||
+    (guard.best !== null && typeof guard.best?.winRate !== 'number')
+  )
+    throw new Error('Invalid or incompatible policy checkpoint');
+  return {
+    recent: guard.recent,
+    best: guard.best && {
+      generation: guard.best.generation,
+      winRate: guard.best.winRate,
+      lead: parsePolicy(guard.best.lead),
+      follow: parsePolicy(guard.best.follow),
+    },
+  };
 }
 export function inferNonPromotionStreak(
   reports: readonly Pick<PolicyReport, 'promoted'>[],
@@ -209,6 +289,8 @@ export interface PolicyCheckpoint {
   sharpGate?: boolean;
   /** Train on the Roblox game's rules and practice more against its bots. */
   robloxRules?: boolean;
+  /** Best learner so far against the Roblox bots, while there is no champion. */
+  robloxGuard?: RobloxGuard;
   nonPromotionStreak?: number;
   generationsSincePromotion?: number;
   /** Generations left before another learner rollback may fire. */
@@ -348,6 +430,9 @@ export function parsePolicyCheckpoint(value: unknown): PolicyCheckpoint {
     archive: checkpoint.archive.map(parsePolicy),
     sharpGate: checkpoint.sharpGate ?? true,
     ...(checkpoint.robloxRules === true ? { robloxRules: true } : {}),
+    ...(checkpoint.robloxGuard
+      ? { robloxGuard: parseRobloxGuard(checkpoint.robloxGuard) }
+      : {}),
     rollbackCooldown: checkpoint.rollbackCooldown ?? 0,
     // A version migration retires the champion, which must re-earn its place,
     // but the archived opponents keep their value as sparring partners: their
@@ -1030,8 +1115,12 @@ export function trainPolicyGeneration(
   const sharpGate = checkpoint.sharpGate ?? true;
   const vsSharp = gatesPassed ? evaluate('sharp', 'validation-sharp') : null;
   const sharpPassed = !vsSharp || !sharpGate || policyPasses(vsSharp);
+  // A Roblox-rules run always measures this: the guard needs every generation,
+  // above all the ones bad enough to fail the cheaper gates.
   const vsRoblox =
-    gatesPassed && sharpPassed ? evaluate('roblox', 'validation-roblox') : null;
+    checkpoint.robloxRules === true || (gatesPassed && sharpPassed)
+      ? evaluate('roblox', 'validation-roblox')
+      : null;
   const robloxPassed = !vsRoblox || policyPasses(vsRoblox);
   const archived =
     gatesPassed && sharpPassed && robloxPassed
@@ -1117,6 +1206,17 @@ export function trainPolicyGeneration(
     leadOptimizer: leadUpdate.optimizer,
     followOptimizer: followUpdate.optimizer,
   });
+  const robloxGuard =
+    checkpoint.robloxRules === true && !champion && !promoted && vsRoblox
+      ? resolveRobloxGuard({
+          guard: checkpoint.robloxGuard,
+          winRate: vsRoblox.wins / vsRoblox.games,
+          generation,
+          evaluated: evaluatedPair,
+        })
+      : null;
+  const returnedToBest = robloxGuard?.returnTo ?? null;
+  const streakAfterGuard = returnedToBest ? 0 : learnerState.nonPromotionStreak;
   onPhase?.(
     'generation',
     performance.now() - generationStarted,
@@ -1131,21 +1231,27 @@ export function trainPolicyGeneration(
   const models = resolveGenerationModels({
     promoted,
     evaluated: evaluatedPair,
-    learner: { lead: learnerState.lead, follow: learnerState.follow },
+    learner: returnedToBest ?? {
+      lead: learnerState.lead,
+      follow: learnerState.follow,
+    },
     champion,
   });
   return {
     ...checkpoint,
+    ...(robloxGuard ? { robloxGuard: robloxGuard.guard } : {}),
     generation,
-    nonPromotionStreak: learnerState.nonPromotionStreak,
+    nonPromotionStreak: streakAfterGuard,
     generationsSincePromotion,
     rollbackCooldown,
     championMarginSamples:
       promoted || learnerState.learnerReset ? [] : championMarginSamples,
     championLevelMarginSamples:
       promoted || learnerState.learnerReset ? [] : championLevelMarginSamples,
-    leadOptimizer: learnerState.leadOptimizer,
-    followOptimizer: learnerState.followOptimizer,
+    leadOptimizer: returnedToBest ? newOptimizer() : learnerState.leadOptimizer,
+    followOptimizer: returnedToBest
+      ? newOptimizer()
+      : learnerState.followOptimizer,
     policyArchive:
       promoted && champion ? retainArchive(archive, champion) : archive,
     learner: models.learner.lead,
@@ -1179,8 +1285,22 @@ export function trainPolicyGeneration(
         promoted,
         learnerReset: preflightRollback || learnerState.learnerReset,
         rollbackCooldown,
-        nonPromotionStreak: learnerState.nonPromotionStreak,
+        nonPromotionStreak: streakAfterGuard,
         generationsSincePromotion,
+        ...(robloxGuard
+          ? {
+              robloxGuard: {
+                recentWinRate:
+                  robloxGuard.guard.recent.length === ROBLOX_GUARD_WINDOW
+                    ? robloxGuard.guard.recent.reduce((a, b) => a + b, 0) /
+                      ROBLOX_GUARD_WINDOW
+                    : null,
+                bestWinRate: robloxGuard.guard.best?.winRate ?? null,
+                bestGeneration: robloxGuard.guard.best?.generation ?? null,
+                returnedToBest: returnedToBest !== null,
+              },
+            }
+          : {}),
         ...(championRegression ? { championRegression } : {}),
         ...(confirmation
           ? {

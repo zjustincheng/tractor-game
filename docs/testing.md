@@ -171,6 +171,8 @@ These tests do not contact a paid API, measure model quality, or establish stren
 
 Policy evaluation tests cover promotion with a positive level interval and point uncertainty crossing zero, rejection beyond the −0.01 point tolerance, level-based rollback, separate point/level evidence, invalid evidence, legacy checkpoint loading, and descriptive round-win counts. Existing generation tests cover optimizer reset and cooldown, and the integration promotion test verifies the saved model matches the evaluated model. No long training or fresh-seed strength evaluation is part of these automated tests; random-level quick-match strength remains unmeasured.
 
+`backend/src/training/roblox-guard.test.ts` covers the Roblox-rules best-learner guard: it needs a full four-generation window, keeps the learner ending the best stretch, ignores ordinary swings, returns after a sustained drop, gives a restored learner a fresh window, and survives checkpoint resume. It replays the real scores from the run that declined at generations 237-245. It does not show that the guard makes a run beat the Roblox bots.
+
 # Roblox foundation
 
 `roblox/tests/practice.lua` exercises the native pure Lua-compatible card and
