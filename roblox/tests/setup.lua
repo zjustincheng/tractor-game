@@ -3,6 +3,9 @@ local Structures = dofile('roblox/src/shared/Structures.luau')(Cards)
 local Rules = dofile('roblox/src/shared/PlayRules.luau')(Cards, Structures)
 local Scoring = dofile('roblox/src/shared/Scoring.luau')(Cards)
 local Practice = dofile('roblox/src/server/Practice.luau')(Cards, Structures, Rules, Scoring)
+-- These checks were written for an 8-second declaration window; the game now
+-- uses a longer one, so pin the timing they assume.
+Practice.DECLARE_SECONDS = 8
 -- Completes the Chao Di round that follows every burial: the human passes and
 -- bots decide, so tests continue into trick play.
 local function finishChaodi(state)
@@ -11,6 +14,8 @@ local function finishChaodi(state)
     steps=steps+1; assert(steps<100,'Chao Di did not finish')
     if state.chaodiTurn==1 then assert(Practice.chaodiPass(state,1,0)) else assert(Practice.stepChaodiBot(state,0)) end
   end
+  -- The Double window follows Chao Di; close it so play can start.
+  if state.phase=='doubling' then assert(Practice.endDoubling(state,0,true)) end
 end
 local function new() return Practice.new(function(n) return n end, 100) end
 local state = new()

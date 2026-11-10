@@ -35,6 +35,7 @@ local function playRound(Practice,playerCount,seed,inspect)
   while not state.done do
     steps=steps+1; assert(steps<5000,'stuck in '..state.phase)
     if state.phase=='chaodi' then Practice.stepChaodiBot(state,now)
+    elseif state.phase=='doubling' then assert(Practice.endDoubling(state,now,true))
     elseif state.phase=='trick-review' then assert(Practice.nextTrick(state))
     elseif state.phase=='tricks' then
       if inspect then inspect(state) end

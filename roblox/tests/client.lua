@@ -24,7 +24,11 @@ Vector2 = {new=function(x,y) return {X=x,Y=y} end}
 TweenInfo = {new=function() return {} end}
 local function dim(scale, offset) return { Scale = scale, Offset = offset } end
 UDim = { new = dim }
-UDim2 = { new = function(xs, xo, ys, yo) return { X = dim(xs or 0, xo or 0), Y = dim(ys or 0, yo or 0) } end }
+-- UDim2 values add and subtract like Roblox's.
+local udim2Meta = {}
+UDim2 = { new = function(xs, xo, ys, yo) return setmetatable({ X = dim(xs or 0, xo or 0), Y = dim(ys or 0, yo or 0) }, udim2Meta) end }
+udim2Meta.__add = function(a, b) return UDim2.new(a.X.Scale + b.X.Scale, a.X.Offset + b.X.Offset, a.Y.Scale + b.Y.Scale, a.Y.Offset + b.Y.Offset) end
+udim2Meta.__sub = function(a, b) return UDim2.new(a.X.Scale - b.X.Scale, a.X.Offset - b.X.Offset, a.Y.Scale - b.Y.Scale, a.Y.Offset - b.Y.Offset) end
 UDim2.fromOffset = function(x, y) return UDim2.new(0, x, 0, y) end
 UDim2.fromScale = function(x, y) return UDim2.new(x, 0, y, 0) end
 -- Like Roblox: R/G/B in 0–1; r/g/b (0–255) feed the preview renderer.
@@ -85,10 +89,25 @@ function methods:FindFirstChildOfClass(cls) for _,c in ipairs(self.children) do 
 function methods:IsA() return false end
 function methods:ClearAllChildren() self.children={} end
 function methods:WaitForChild(name) return self:FindFirstChild(name) end
+function methods:Clone()
+  local copy = Instance.new(self.ClassName)
+  for key, value in pairs(self.props) do if key ~= 'Parent' then copy[key] = value end end
+  for _, child in ipairs(self.children) do child:Clone().Parent = copy end
+  return copy
+end
+function methods:FindFirstAncestorOfClass() return nil end
+function methods:GetDescendants()
+  local result = {}
+  local function walk(node) for _, child in ipairs(node.children) do table.insert(result, child); walk(child) end end
+  walk(self)
+  return result
+end
 local playerGui = Instance.new('PlayerGui')
 local sent = {}
 local remote = { OnClientEvent = signal(), FireServer = function(_, ...) table.insert(sent, {...}) end }
-local shared = { Cards = Cards, Catalog = Catalog, TableLayout = Layout, Structures = dofile('roblox/src/shared/Structures.luau'), PlayRules = dofile('roblox/src/shared/PlayRules.luau'), Scoring = dofile('roblox/src/shared/Scoring.luau'), WaitForChild = function() return remote end }
+local shared = { Cards = Cards, Catalog = Catalog, TableLayout = Layout, Structures = dofile('roblox/src/shared/Structures.luau'), PlayRules = dofile('roblox/src/shared/PlayRules.luau'), Scoring = dofile('roblox/src/shared/Scoring.luau'), Tracker = dofile('roblox/src/shared/Tracker.luau') }
+-- Shared modules by name; anything else (the Action remote) is the remote.
+shared.WaitForChild = function(_, name) return rawget(shared, name) or remote end
 local storage = { WaitForChild = function() return shared end }
 local players = { LocalPlayer = { UserId = 7, DisplayName = 'Tester', WaitForChild = function() return playerGui end } }
 local services = {}
@@ -104,9 +123,18 @@ function methods:Create(object, _, props)
   return {Play=function() end, Cancel=function() end, Completed={Connect=function() end}}
 end
 function methods:GetFocusedTextBox() return nil end
+-- TextService: a rough width estimate is enough for layout code.
+function methods:GetTextSize(text, size) return { X = #tostring(text) * (size or 14) * 0.55, Y = size or 14 } end
 require = function(module) return module end
+workspace = { CurrentCamera = { ViewportSize = { X = width, Y = height } } }
 -- Client ModuleScripts are siblings of the LocalScript.
-script = { Parent = { WaitForChild = function(_, name) return dofile('roblox/src/client/' .. name .. '.luau') end } }
+-- The client is a folder of UI modules loaded in order by Main.client.luau.
+script = { Parent = { WaitForChild = function(_, name)
+  if name == 'UI' then
+    return { WaitForChild = function(_, module) return dofile('roblox/src/client/UI/' .. module .. '.luau') end }
+  end
+  return dofile('roblox/src/client/' .. name .. '.luau')
+end } }
 -- Delayed callbacks queue until a test calls flushDelays(); the clock can be
 -- advanced to skip cooldowns.
 local pendingDelays = {}
@@ -148,8 +176,20 @@ assert(find(playerGui, 'TractorBackdrop').ScreenInsets == Enum.ScreenInsets.None
 assert(find(playerGui, 'Backdrop').Size.X.Scale == 1 and find(playerGui, 'Backdrop').Size.Y.Scale == 1)
 assert(find(playerGui, 'TractorTable').ScreenInsets == Enum.ScreenInsets.CoreUISafeInsets)
 receive(nil)
-click('Primary')
-assert(sent[#sent][1] == 'start' and sent[#sent][2].playerCount==4)
+-- Home screen: Classic opens the table picker in Money mode; in Rank mode it queues Ranked.
+scope = find(playerGui, 'Mode1'); click('Action'); scope = nil
+assert(find(playerGui, 'TierScreen').Visible and not find(playerGui, 'HomeScreen').Visible, 'Money mode opens the table picker')
+click('BackBtn')
+assert(find(playerGui, 'HomeScreen').Visible)
+click('RankToggle')
+scope = find(playerGui, 'Mode2'); click('Action'); scope = nil
+assert(sent[#sent][1] == 'queue' and sent[#sent][2].ranked == true and sent[#sent][2].playerCount == 8, 'Rank mode queues Ranked at that size')
+click('MoneyToggle')
+-- The Friends page holds squads and private tables.
+click('FriendsBtn')
+assert(find(playerGui, 'FriendsScreen').Visible and find(playerGui, 'CreatePrivate').Visible)
+scope = find(playerGui, 'FriendsScreen'); click('BackBtn'); scope = nil
+assert(find(playerGui, 'HomeScreen').Visible)
 local state = Practice.new(function(n) return n end, 0)
 receive(state)
 assert(find(playerGui, 'Declarations').Visible and not find(playerGui, 'Primary').Visible)

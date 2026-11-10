@@ -57,6 +57,8 @@ assert(state.phase=='chaodi' and state.chaodiTurn==3,'Challenge passes on after 
 for seat=3,6 do assert(Practice.chaodiPass(state,seat,2)) end
 assert(state.phase=='chaodi' and state.chaodiTurn==1,'The original dealer may still challenge back')
 assert(Practice.chaodiPass(state,1,2))
+assert(state.phase=='doubling','Chao Di ends in the Double window')
+assert(Practice.endDoubling(state,2,true))
 assert(state.phase=='tricks' and state.turn==1 and state.dealer==1,'Original dealer leads the first trick')
 -- Bots challenge only when the new suit clearly helps their hand.
 local function hand(levelHearts, otherHearts, filler)

@@ -20,7 +20,16 @@ local shared = { Cards = Cards, Catalog = Catalog, Structures = StructuresFactor
 game = { PlaceId = 7, GetService = function(_, name)
   if name == 'Players' then return players end
   if name == 'DataStoreService' then return { GetDataStore = function() return fakeStore end } end
-  return { WaitForChild = function() return shared end }
+  -- Cross-server services stay missing so this server matches players locally.
+  if name ~= 'MarketplaceService' and name ~= 'BadgeService' and name ~= 'AnalyticsService' then
+    return { WaitForChild = function() return shared end }
+  end
+  return setmetatable({ WaitForChild = function() return shared end }, { __index = function(t, key)
+    -- Purchases, badges and analytics: any member is a connectable event that does nothing.
+    local member = setmetatable({ Connect = function(self, handler) self.handler = handler end }, { __call = function() return nil end })
+    rawset(t, key, member)
+    return member
+  end })
 end }
 script = { Parent = { TrainedBots = dofile('roblox/src/server/TrainedBots.luau'), ChampionModel = dofile('roblox/src/server/ChampionModel.luau'), Practice = dofile('roblox/src/server/Practice.luau'), Persistence = dofile('roblox/src/server/Persistence.luau'), Matchmaker = dofile('roblox/src/server/Matchmaker.luau'), CrossServer = dofile('roblox/src/server/CrossServer.luau') } }
 require = function(module) return module end
@@ -46,7 +55,7 @@ end }
 dofile('roblox/src/server/Main.server.luau')
 
 local function person(name, id)
-  local p = { DisplayName = name, UserId = id }
+  local p = { DisplayName = name, UserId = id, FindFirstChild = function() return nil end }
   players.PlayerAdded.handler(p)
   return p
 end
@@ -137,6 +146,43 @@ if not view(ana).done then
   assert(inbox[ben].message and inbox[ben].message:find('ran out of time'), 'The table is told why')
 end
 
+-- A second timeout in a row marks Ben away: his turns then get a short timer
+-- until he acts again.
+local function untilBensTurn()
+  local guard = 0
+  while not view(ana).done and not (view(ben).phase == 'tricks' and view(ben).turn == 1) do
+    guard = guard + 1; assert(guard < 500, 'Ben never got a turn')
+    local g = view(ana)
+    if (g.phase == 'tricks' and g.turn == 1) or (g.phase == 'kitty' and g.kittyHolder == 1) or (g.phase == 'chaodi' and g.chaodiTurn == 1) then act()
+    else now = now + 1; command(ana, 'sync') end
+  end
+  return not view(ana).done
+end
+-- A fresh round, so Ben has turns left for two timeouts (topped up: lost rounds cost coins).
+_G.sessions[ana].coins, _G.sessions[ben].coins = 10000, 10000
+command(ana, 'start')
+local awayChecked = false
+if untilBensTurn() then
+  now = now + 26
+  command(ana, 'sync')
+  assert(inbox[ben].message and inbox[ben].message:find('ran out of time'), 'A first timeout plays a suggested move')
+end
+if untilBensTurn() then
+  now = now + 26
+  command(ana, 'sync')
+  assert(inbox[ben].message and inbox[ben].message:find('seems to be away'), 'Two timeouts in a row mark a player away')
+  awayChecked = true
+  if untilBensTurn() then
+    assert(view(ben).turnDeadline - now <= 3.5, 'An away player gets a short timer')
+    local g = view(ben)
+    local chosen = Rules.choose(g.hand, g.trick[1] and g.trick[1].components, g.trump)
+    local ids = {}; for _, c in ipairs(chosen) do table.insert(ids, c.id) end
+    command(ben, 'play', ids, g.revision)
+    if untilBensTurn() then assert(view(ben).turnDeadline - now > 10, 'Playing again restores the normal timer') end
+  end
+end
+assert(awayChecked, 'The away checks ran')
+
 -- Leaving: the seat goes to a bot and the host role passes on.
 command(ana, 'leave')
 assert(inbox[ana].table == nil and inbox[ana].game == nil)
@@ -150,6 +196,9 @@ command(ana, 'squad_invite', 102)
 assert(reactions[ben] and reactions[ben].type == 'invite' and reactions[ben].fromName == 'Ana', 'Ben gets a squad invite')
 assert(inbox[ben].invites[1] and inbox[ben].invites[1].fromId == 101)
 command(ben, 'squad_accept', 101)
+-- A lost round costs coins now that captured points pay only on wins; top both
+-- players up so the queue checks below are about squads, not balances.
+_G.sessions[ana].coins, _G.sessions[ben].coins = 10000, 10000
 assert(#inbox[ana].squad.members == 2 and inbox[ana].squad.isLeader and not inbox[ben].squad.isLeader, 'Ana leads a squad of two')
 assert(command(ben, 'queue', { playerCount = 4, tier = 'novice' }).message:find('leader'), 'Only the leader queues')
 -- Squad + two solos fill a 4-player table at once, squad on one team.
@@ -198,4 +247,4 @@ assert(view(dev) and inbox[dev].table.id ~= inbox[cai].table.id and inbox[dev].t
 players.PlayerRemoving.handler(dev)
 command(cai, 'sync')
 assert(inbox[cai].table.humans == 1, 'Others leaving never affects your table')
-print('PASS: private codes, rotated seats and views, host start, shared round settled per player, reactions between seats, idle auto-play, leaving and host handover, squads (invite, accept, leader-only queue, teammates, size limit, kick, public/private join, disconnect), matchmaking wait and bots')
+print('PASS: private codes, rotated seats and views, host start, shared round settled per player, reactions between seats, idle auto-play, away after two timeouts, leaving and host handover, squads (invite, accept, leader-only queue, teammates, size limit, kick, public/private join, disconnect), matchmaking wait and bots')

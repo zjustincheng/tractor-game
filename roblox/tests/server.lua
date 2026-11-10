@@ -21,7 +21,7 @@ local fakeStore = {
 }
 local warnings = 0
 warn = function() warnings = warnings + 1 end
-local player = { DisplayName = 'Player', UserId = 42 }
+local player = { DisplayName = 'Player', UserId = 42, FindFirstChild = function() return nil end }
 local now, latest, remote, broadcastCount, lastBroadcast = 0, nil, nil, 0, nil
 local inbox, received = {}, {} -- latest state / reaction per player
 local function signal()
@@ -29,7 +29,16 @@ local function signal()
 end
 local players = { PlayerAdded = signal(), PlayerRemoving = signal(), GetPlayers = function() return {player} end }
 local shared = { Cards = Cards, Catalog = Catalog, Structures=StructuresFactory, PlayRules=RulesFactory, Scoring=ScoringFactory }
-local storage = { WaitForChild = function() return shared end }
+-- Services the tests do not model (purchases, badges, analytics): any field is
+-- an event you can connect to, and calling it does nothing.
+local function quietService(base)
+  return setmetatable(base or {}, { __index = function(t, key)
+    local member = setmetatable({ Connect = function(self, handler) self.handler = handler end }, { __call = function() return nil end })
+    rawset(t, key, member)
+    return member
+  end })
+end
+local storage = quietService({ WaitForChild = function() return shared end })
 game = { GetService = function(_, name)
   if name == 'Players' then return players end
   if name == 'DataStoreService' then return { GetDataStore = function() return fakeStore end } end
@@ -110,7 +119,7 @@ local function playRound()
   assert(latest.message == 'Table updated. Please choose again.' and latest.game.declaration == nil or latest.game.declaration.seat ~= 1,
     'Index-based commands from a stale view are rejected')
   command('declare', 1, latest.game.revision)
-  now = now + 8
+  now = now + 13 -- past the 12-second declaration window
   command('sync')
   if latest.game.phase == 'kitty' then
     local ids = {}
@@ -121,6 +130,13 @@ local function playRound()
   while latest.game.phase == 'chaodi' do
     steps = steps + 1; assert(steps < 200, 'Chao Di did not finish')
     if latest.game.chaodiTurn == 1 then command('chaodi_pass', nil, latest.game.revision) else command('sync') end
+  end
+  -- The Double window closes on its own after its deadline.
+  steps = 0
+  while latest.game.phase == 'doubling' do
+    steps = steps + 1; assert(steps < 20, 'Double window did not close')
+    now = now + 9
+    command('sync')
   end
   assert(latest.game.phase == 'tricks')
   if latest.game.turn ~= 1 then command('sync') end
@@ -233,16 +249,16 @@ assert(latest.coins == coinsBeforeLeaving and latest.owned.laugh, 'Coins and unl
 assert(latest.stats.roundsPlayed == statsBeforeLeaving.roundsPlayed and latest.stats.roundsWon == statsBeforeLeaving.roundsWon, 'Stats survive rejoining')
 assert(saved.player_42.version == 1 and saved.player_42.owned.laugh)
 
--- Daily reward is once per calendar day, including across rejoin.
+-- Daily reward (day 1 of the login streak) is once per calendar day, including across rejoin.
 command('claim_daily')
-assert(latest.coins == coinsBeforeLeaving + 1000 and latest.dailyClaimed)
+assert(latest.coins == coinsBeforeLeaving + Catalog.loginStreak[1] and latest.dailyClaimed)
 now = now + 1
 command('claim_daily')
-assert(latest.coins == coinsBeforeLeaving + 1000, 'Daily reward cannot be claimed twice')
+assert(latest.coins == coinsBeforeLeaving + Catalog.loginStreak[1], 'Daily reward cannot be claimed twice')
 players.PlayerRemoving.handler(player)
 players.PlayerAdded.handler(player)
 command('sync')
-assert(latest.dailyClaimed and latest.coins == coinsBeforeLeaving + 1000, 'Rejoining does not reset the daily reward')
+assert(latest.dailyClaimed and latest.coins == coinsBeforeLeaving + Catalog.loginStreak[1], 'Rejoining does not reset the daily reward')
 
 -- Equipped items must be owned; unknown ids and bad numbers are dropped.
 saved.player_42 = { coins = -5, vaultCoins = 0/0, owned = { laugh = true, hacked_item = true, product_coins_10k = true },

@@ -3,6 +3,9 @@ local S=dofile('roblox/src/shared/Structures.luau')(Cards)
 local Rules=dofile('roblox/src/shared/PlayRules.luau')(Cards,S)
 local Scoring=dofile('roblox/src/shared/Scoring.luau')(Cards)
 local Practice=dofile('roblox/src/server/Practice.luau')(Cards,S,Rules,Scoring)
+-- These checks were written for an 8-second declaration window; the game now
+-- uses a longer one, so pin the timing they assume.
+Practice.DECLARE_SECONDS = 8
 local index=0
 local function cards(ranks,suit)
   local result={}

@@ -26,6 +26,7 @@ local function round(seed,team,attacking)
   while not state.done do
     steps=steps+1; assert(steps<5000,'round stuck in '..state.phase)
     if state.phase=='chaodi' then Practice.stepChaodiBot(state,now)
+    elseif state.phase=='doubling' then assert(Practice.endDoubling(state,now,true))
     elseif state.phase=='trick-review' then assert(Practice.nextTrick(state))
     elseif state.phase=='tricks' then Practice.bots(state)
     elseif state.phase~='finished' then error('unexpected phase '..state.phase) end

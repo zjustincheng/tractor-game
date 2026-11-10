@@ -4,6 +4,9 @@ local S=dofile('roblox/src/shared/Structures.luau')(Cards)
 local Rules=dofile('roblox/src/shared/PlayRules.luau')(Cards,S)
 local Scoring=dofile('roblox/src/shared/Scoring.luau')(Cards)
 local Practice=dofile('roblox/src/server/Practice.luau')(Cards,S,Rules,Scoring)
+-- These checks were written for an 8-second declaration window; the game now
+-- uses a longer one, so pin the timing they assume.
+Practice.DECLARE_SECONDS = 8
 
 local function ids(cards) local result={}; for _,c in ipairs(cards) do table.insert(result,c.id) end; return result end
 local function settle(state, humans)
@@ -15,6 +18,7 @@ local function settle(state, humans)
     elseif state.phase=='chaodi' then
       if humans[state.chaodiTurn] then assert(Practice.autoAct(state,state.chaodiTurn,0)) else assert(Practice.stepChaodiBot(state,0)) end
     elseif state.phase=='kitty' then assert(Practice.autoAct(state,state.kittyHolder or state.dealer,0))
+    elseif state.phase=='doubling' then assert(Practice.endDoubling(state,0,true))
     elseif state.phase=='tricks' then
       if humans[state.turn] then assert(Practice.autoAct(state,state.turn,0)) else assert(Practice.stepBot(state)) end
     else error('Unexpected phase '..tostring(state.phase)) end
@@ -43,6 +47,7 @@ assert(Practice.advance(state,8,function()return 1 end)); assert(Practice.advanc
 while state.phase~='tricks' do
   if state.phase=='chaodi' then
     if humans[state.chaodiTurn] then assert(Practice.autoAct(state,state.chaodiTurn,0)) else assert(Practice.stepChaodiBot(state,0)) end
+  elseif state.phase=='doubling' then assert(Practice.endDoubling(state,0,true))
   else assert(Practice.autoAct(state,state.kittyHolder or state.dealer,0)) end
 end
 for _=1,6 do

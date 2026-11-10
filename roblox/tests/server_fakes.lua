@@ -10,6 +10,16 @@ return function(options)
   local fakes = { inbox = {}, events = {}, teleports = {}, published = {}, subscribers = {}, maps = {}, reserved = 0,
     clock = 0, wall = 1000000, Rules = RulesFactory(Cards, StructuresFactory(Cards)) }
   local function signal() return { Connect = function(self, handler) self.handler = handler end } end
+  -- Services the tests do not model (purchases, badges, analytics): any field is
+  -- an event you can connect to, and calling it does nothing.
+  local function quietService(base)
+    return setmetatable(base or {}, { __index = function(t, key)
+      local member = setmetatable({ Connect = function(self, handler) self.handler = handler end }, { __call = function() return nil end })
+      rawset(t, key, member)
+      return member
+    end })
+  end
+
   local function sortedMap(name)
     if fakes.maps[name] then return fakes.maps[name] end
     local data = {}
@@ -53,7 +63,7 @@ return function(options)
     RunService = { IsStudio = function() return false end, IsRunning = function() return false end, IsServer = function() return false end },
     DataStoreService = { GetDataStore = function() return { GetAsync = function() return nil end, UpdateAsync = function(_, _, t) return t(nil) end } end } }
   game = { PlaceId = 7, JobId = options.jobId or 'server-A', PrivateServerId = options.privateServerId or '', PrivateServerOwnerId = 0,
-    GetService = function(_, name) return services[name] or { WaitForChild = function() return shared end } end }
+    GetService = function(_, name) return services[name] or quietService({ WaitForChild = function() return shared end }) end }
   script = { Parent = { TrainedBots = dofile('roblox/src/server/TrainedBots.luau'), ChampionModel = dofile('roblox/src/server/ChampionModel.luau'), Practice = dofile('roblox/src/server/Practice.luau'), Persistence = dofile('roblox/src/server/Persistence.luau'),
     Matchmaker = dofile('roblox/src/server/Matchmaker.luau'), CrossServer = dofile('roblox/src/server/CrossServer.luau') } }
   require = function(module) return module end
@@ -83,7 +93,7 @@ return function(options)
   end }
   dofile('roblox/src/server/Main.server.luau')
   function fakes.person(name, userId, joinData)
-    local person = { DisplayName = name, UserId = userId }
+    local person = { DisplayName = name, UserId = userId, FindFirstChild = function() return nil end }
     function person:GetJoinData() return { TeleportData = joinData } end
     players.PlayerAdded.handler(person)
     return person
