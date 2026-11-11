@@ -99,10 +99,10 @@ return function(Cards, S)
     for _, c in ipairs(current) do if c.category ~= previous then return false end end
     if category ~= previous then return category == 'trump' end
     if keys(challenger,true) == keys(current,true) then return false end
-    for _, c in ipairs(challenger) do for _, old in ipairs(current) do
-      if S.sameShape(c,old) and c.highestPower > old.highestPower then return true end
-    end end
-    return false
+    -- A thrown combination is decided by its largest pattern only. Comparing
+    -- every piece let a weaker throw steal the trick on a high stray single.
+    local mine, theirs = S.largest(challenger), S.largest(current)
+    return mine ~= nil and theirs ~= nil and S.sameShape(mine,theirs) and mine.highestPower > theirs.highestPower
   end
   function Rules.winning(cards,lead,current,trump)
     if isFourCardTractor(lead) then

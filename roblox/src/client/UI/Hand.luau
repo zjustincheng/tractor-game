@@ -203,6 +203,8 @@ C.renderHand = function()
     local object, stroke = cardFace(handFrame, card, 'Card_' .. card.id, layout.cardWidth, layout.cardHeight, function()
       if C.busy or current.done then return end
       if current.phase ~= 'kitty' and current.phase ~= 'tricks' then return end
+      -- Only the kitty holder picks burial cards (you are seat 1 in this view).
+      if current.phase == 'kitty' and (current.kittyHolder or current.dealer) ~= 1 then return end
       if C.handDragVisited[chosen.id] then return end
       C.handDragVisited[chosen.id] = true
       playSound('card_select')

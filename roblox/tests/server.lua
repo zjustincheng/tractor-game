@@ -247,7 +247,7 @@ command('sync')
 local session = _G.sessions[player]
 assert(latest.coins == coinsBeforeLeaving and latest.owned.laugh, 'Coins and unlocks survive rejoining')
 assert(latest.stats.roundsPlayed == statsBeforeLeaving.roundsPlayed and latest.stats.roundsWon == statsBeforeLeaving.roundsWon, 'Stats survive rejoining')
-assert(saved.player_42.version == 1 and saved.player_42.owned.laugh)
+assert(saved.player_42.version == 2 and saved.player_42.owned.laugh, 'Saves are written at the current version')
 
 -- Daily reward (day 1 of the login streak) is once per calendar day, including across rejoin.
 command('claim_daily')
@@ -272,7 +272,7 @@ assert(latest.coins == 0, 'Negative coins clamp to zero')
 assert(latest.stats.roundsPlayed == 0 and latest.stats.roundsWon == 0 and latest.stats.hacked == nil, 'Corrupt stats are cleaned')
 assert(latest.owned.laugh and not latest.owned.hacked_item and not latest.owned.product_coins_10k)
 assert(latest.equipped.cardBack == 'cardback_classic', 'Cannot equip an unowned card back')
-assert(latest.equipped.felt == 'felt_ruby', 'Starter-owned felt can stay equipped')
+assert(latest.equipped.felt == 'felt_emerald', 'A paid felt an old save got free is taken back, so the starter felt is equipped')
 
 -- A failed load never overwrites saved progress.
 players.PlayerRemoving.handler(player)

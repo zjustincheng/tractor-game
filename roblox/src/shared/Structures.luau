@@ -24,6 +24,21 @@ return function(Cards)
     table.sort(ids); return table.concat(ids, '|')
   end
   function S.sameShape(a,b) return a.multiplicity == b.multiplicity and a.rankCount == b.rankCount end
+  -- The biggest pattern in a play: most cards per rank first, then the longest
+  -- run, then the highest card. A thrown combination (gamble) is won or lost on
+  -- this piece alone, so a smaller piece can never decide the trick.
+  function S.largest(components)
+    local best
+    for _, c in ipairs(components) do
+      if not best
+        or c.multiplicity > best.multiplicity
+        or (c.multiplicity == best.multiplicity and c.rankCount > best.rankCount)
+        or (c.multiplicity == best.multiplicity and c.rankCount == best.rankCount and c.highestPower > best.highestPower) then
+        best = c
+      end
+    end
+    return best
+  end
   function S.homogeneous(cards, trump)
     if #cards == 0 then return nil end
     local category, ids = Cards.category(cards[1], trump), {}
@@ -116,18 +131,17 @@ return function(Cards)
     for _, shape in ipairs(ordered) do needed = needed + shape.multiplicity * shape.rankCount end
     if needed > #cards or (options.requireAllCards and needed ~= #cards) then return nil end
     -- Avoid exploring every partition when no comparable component can possibly beat.
+    -- Only the largest pattern can win the trick, so only it is worth testing.
+    -- `ordered` is sorted biggest-first, so that is ordered[1].
     if options.mustBeat then
       local possible = false
-      for _, shape in ipairs(ordered) do
+      local target, shape = S.largest(options.mustBeat), ordered[1]
+      if target and shape then
         for _, candidate in ipairs(S.available(cards,trump,shape)) do
-          for _, current in ipairs(options.mustBeat) do
-            if S.sameShape(candidate,current) and
-              ((candidate.category==current.category and candidate.highestPower>current.highestPower) or
-              (candidate.category~=current.category and candidate.category=='trump')) then possible=true; break end
-          end
-          if possible then break end
+          if S.sameShape(candidate,target) and
+            ((candidate.category==target.category and candidate.highestPower>target.highestPower) or
+            (candidate.category~=target.category and candidate.category=='trump')) then possible=true; break end
         end
-        if possible then break end
       end
       if not possible then return nil end
     end
@@ -144,11 +158,11 @@ return function(Cards)
           for _, card in ipairs(candidate.cards) do if sourceCounts[S.identity(card)] > shape.multiplicity then protected = true end end
         end
         if not protected then
-          for _, current in ipairs(options.mustBeat or {}) do
-            if S.sameShape(candidate,current) and
-              ((candidate.category == current.category and candidate.highestPower > current.highestPower) or
-              (candidate.category ~= current.category and candidate.category == 'trump')) then beats = true end
-          end
+          -- index 1 is the largest pattern; smaller pieces never win the trick.
+          local target = options.mustBeat and S.largest(options.mustBeat)
+          if target and index == 1 and S.sameShape(candidate,target) and
+            ((candidate.category == target.category and candidate.highestPower > target.highestPower) or
+            (candidate.category ~= target.category and candidate.category == 'trump')) then beats = true end
           local rest = search(S.without(remaining,candidate.cards), index+1, hasBeaten or beats)
           if rest then table.insert(rest,1,candidate); return rest end
         end

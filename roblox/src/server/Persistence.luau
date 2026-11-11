@@ -4,7 +4,11 @@
 -- session unsaved so defaults never overwrite real progress.
 return function(store, catalog, wait)
   local Persistence = {}
-  Persistence.VERSION = 1
+  Persistence.VERSION = 2
+  -- Paid cosmetics that version 1 handed out as starter unlocks. Nobody ever
+  -- bought these (owning one made buying impossible), so taking them back on
+  -- the first version-2 load cannot remove anything a player paid for.
+  local WRONGLY_GRANTED = { 'tomato', 'bomb', 'coffee', 'tractor_rush', 'felt_sapphire', 'felt_ruby', 'felt_obsidian' }
   Persistence.enabled = store ~= nil
   local MAX_COINS = 1e12
   local ATTEMPTS = 3
@@ -36,7 +40,9 @@ return function(store, catalog, wait)
   function Persistence.sanitize(data)
     if type(data) ~= 'table' then return nil end
     local clean = {
-      version = Persistence.VERSION,
+      -- Kept as saved so a load can tell which migrations still need to run;
+      -- snapshot() stamps the current version on everything written back.
+      version = wholeNumber(data.version, 1e6) or 0,
       coins = wholeNumber(data.coins, MAX_COINS),
       vaultCoins = wholeNumber(data.vaultCoins, MAX_COINS),
       lastDailyDay = wholeNumber(data.lastDailyDay, 1e7),
@@ -92,6 +98,7 @@ return function(store, catalog, wait)
 
   function Persistence.snapshot(session)
     return Persistence.sanitize({
+      version = Persistence.VERSION,
       coins = session.coins,
       vaultCoins = session.vaultCoins,
       lastDailyDay = session.lastDailyDay,
@@ -127,6 +134,15 @@ return function(store, catalog, wait)
   -- Saved values replace defaults; starter unlocks stay owned. Equipped items
   -- apply only if owned after merging, which includes starter items.
   function Persistence.apply(session, data)
+    -- One-off: strip the paid cosmetics that version 1 gave away free.
+    if (data.version or 0) < 2 then
+      for _, id in ipairs(WRONGLY_GRANTED) do
+        data.owned[id] = nil
+        session.owned[id] = nil
+      end
+      -- Tell the caller to write the upgraded save, or this runs again next time.
+      session.migrated = true
+    end
     if data.coins then session.coins = data.coins end
     if data.vaultCoins then session.vaultCoins = data.vaultCoins end
     session.lastDailyDay = data.lastDailyDay

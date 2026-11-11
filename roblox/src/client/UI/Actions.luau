@@ -14,10 +14,15 @@ arenaUI.settleShade.Size = UDim2.fromScale(1, 1)
 arenaUI.settleShade.BackgroundTransparency = 0.35
 arenaUI.settleShade.ZIndex = 59
 arenaUI.settleShade.Visible = false
+-- Active makes the shade swallow clicks, so the lobby and table behind the
+-- settlement screen cannot be used while it is up. Every other shade is a
+-- TextButton, which blocks on its own; this one is a plain Frame.
+arenaUI.settleShade.Active = true
 local settlementModal = frame(root, 'SettlementModal', palette.emeraldDeep, 22)
 settlementModal.BackgroundTransparency = 0.05
 settlementModal.Visible = false
 settlementModal.ZIndex = 60
+settlementModal.Active = true
 outline(settlementModal, palette.gold, 2)
 
 local settleBanner = frame(settlementModal, 'Banner', palette.goldDark, 14)
@@ -114,6 +119,7 @@ local function recommendCards()
   local ids = current.hint
   if not ids or #ids == 0 then
     if current.phase == 'kitty' then
+      if (current.kittyHolder or current.dealer) ~= 1 then return end
       local buried = Rules.chooseBurial(current.hand, current.kittySize, current.trump)
       ids = {}; for _, c in ipairs(buried) do table.insert(ids, c.id) end
     elseif current.phase == 'tricks' and current.turn == 1 then
@@ -148,6 +154,8 @@ local function submitSelection()
   end
   local ids = selectedList()
   if current.phase == 'kitty' then
+    -- Only the kitty holder buries (seats are rotated so you are seat 1).
+    if (current.kittyHolder or current.dealer) ~= 1 then return end
     if #ids == current.kittySize then
       playSound('card_play')
       command('bury', ids)

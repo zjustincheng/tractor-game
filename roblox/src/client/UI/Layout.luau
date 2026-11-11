@@ -84,6 +84,11 @@ C.updateAction = function()
     isActionActive = true
     actionText = 'NEW QUICK MATCH'
     handHint.Text = 'Round blocked · tap to restart'
+  elseif current.phase == 'kitty' and (current.kittyHolder or current.dealer) ~= 1 then
+    -- Someone else holds the kitty: nothing to select or confirm.
+    isActionActive = false
+    actionText = 'WAITING…'
+    handHint.Text = arenaUI.role(current.kittyHolder or current.dealer) .. ' is burying the kitty…'
   elseif current.phase == 'kitty' then
     isActionActive = true
     actionText = count == current.kittySize and ('BURY ' .. count .. ' CARDS') or ('BURY CARDS  ' .. count .. ' / ' .. current.kittySize)

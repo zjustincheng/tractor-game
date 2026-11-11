@@ -66,6 +66,7 @@ local function awardBadge(player, key)
 end
 local HIGH_STAKES = { highroller = true, whale = true, legend = true }
 
+
 -- ===== Coin leaderboard (global, all servers) =====
 -- Each save posts the player's coins to an OrderedDataStore; the top 50 are
 -- re-read every 90 seconds and sent to clients that open the leaderboard.
@@ -1369,6 +1370,12 @@ local function connect(player)
     session.saveStatus = { enabled = true }
     if data then Persistence.apply(session, data) end
     session.savedSignature = Persistence.signature(Persistence.snapshot(session))
+    -- A save upgraded while loading (Persistence.apply) is written back now, so
+    -- the one-off migration does not run again next time.
+    if session.migrated then
+      session.migrated = nil
+      task.spawn(saveProgress, player, session, true)
+    end
   else
     local reason = storeProblem or explainStoreError(data)
     session.saveStatus = { enabled = false, reason = reason }

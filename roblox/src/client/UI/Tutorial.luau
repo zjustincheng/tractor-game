@@ -51,8 +51,20 @@ local function pill(parent, label, top, bottom, onClick)
   new('UIGradient', b, { Color = ColorSequence.new(top, bottom), Rotation = 90 })
   local l = outlined(text(b, label, 18, palette.white, Enum.Font.FredokaOne, { Size = UDim2.fromScale(1, 1), TextWrapped = false }), 1.5)
   b.Activated:Connect(function() playSound('click'); onClick() end)
-  b.MouseEnter:Connect(function() TweenService:Create(b, TweenInfo.new(0.12), { Size = b.Size + UDim2.fromOffset(4, 2) }):Play() end)
-  b.MouseLeave:Connect(function() TweenService:Create(b, TweenInfo.new(0.12), { Size = b.Size - UDim2.fromOffset(4, 2) }):Play() end)
+  -- Grow on hover, back to the remembered size on leave. Reading b.Size on
+  -- leave would read a half-finished tween, so repeated hovering used to make
+  -- the buttons drift until they overlapped each other.
+  local baseSize, hovering = nil, false
+  b.MouseEnter:Connect(function()
+    if hovering then return end
+    hovering, baseSize = true, b.Size
+    TweenService:Create(b, TweenInfo.new(0.12), { Size = baseSize + UDim2.fromOffset(4, 2) }):Play()
+  end)
+  b.MouseLeave:Connect(function()
+    if not hovering then return end
+    hovering = false
+    TweenService:Create(b, TweenInfo.new(0.12), { Size = baseSize or b.Size }):Play()
+  end)
   return b, l
 end
 
@@ -167,7 +179,9 @@ local SLIDES = {
 }
 
 -- ===== Slideshow =====
-local shade = new('Frame', gui, { Name = 'Shade', BackgroundColor3 = color(0, 0, 0), BackgroundTransparency = 0.35, Size = UDim2.fromScale(1, 1), Visible = false, Active = true })
+-- ZIndex 10 keeps the slideshow above the coach bubble and the pointer, which
+-- are siblings in this same ScreenGui.
+local shade = new('Frame', gui, { Name = 'Shade', BackgroundColor3 = color(0, 0, 0), BackgroundTransparency = 0.35, Size = UDim2.fromScale(1, 1), Visible = false, Active = true, ZIndex = 10 })
 local panel = new('Frame', shade, { Name = 'Panel', BackgroundColor3 = palette.white, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(620, 470) })
 round(panel, 22); stroke(panel, GOLD, 4)
 new('UIGradient', panel, { Color = ColorSequence.new(color(46, 54, 96), color(20, 22, 44)), Rotation = 90 })
@@ -277,6 +291,9 @@ local skipBtn = new('TextButton', bubble, { Text = 'Skip tutorial', TextSize = 1
 
 local function coach(key, icon, title, body)
   if tipsShown[key] then return end
+  -- Never cover the slideshow with a tip; leave it unshown so it comes back
+  -- once the player closes the slides.
+  if shade.Visible then return end
   tipsShown[key] = true
   coachIcon.Text, coachTitle.Text, coachBody.Text = icon, title, body
   local cam = workspace.CurrentCamera
@@ -308,6 +325,8 @@ skipBtn.Activated:Connect(function() finish('skipped') end)
 -- Opens the slideshow. `firstTime` = the automatic one for new players.
 function C.openTutorial(firstTime)
   hidePointer()
+  -- A tip already on screen would sit on top of the slides.
+  bubble.Visible = false
   fit()
   show(1)
   shade.Visible = true
@@ -373,7 +392,7 @@ local function onState()
     coach('declare', '👑', 'CHOOSE TRUMP',
       'Cards are being dealt. Got a card of the level shown at top left? Tap its suit button below to make that suit trump. Or just wait, someone will.')
   elseif g.phase == 'kitty' and (g.kittyHolder or g.dealer) == 1 then
-    coach('kitty', '🂠', 'BURY THE KITTY',
+    coach('kitty', '🎴', 'BURY THE KITTY',
       'You picked up the bottom cards! Choose ' .. tostring(g.kittySize or 8) .. ' cards you do not need and tap BURY. Tap the button with nothing picked to auto-select.')
   elseif g.phase == 'chaodi' and g.chaodiTurn == 1 then
     coach('chaodi', '🔥', 'CHAO DI?',

@@ -193,7 +193,12 @@ task.spawn(function()
             phaseLine.Text = (declaration and (declarantName .. ' declared ' .. (symbols[declaration.suit] or '★') .. ' ' .. current.trump.level .. countStr) or 'Waiting for a declaration') .. '  ·  ' .. remaining .. 's'
           end
         end
-      elseif current.phase == 'kitty' then phaseLine.Text = 'BURY ' .. #selectedList() .. ' / ' .. current.kittySize .. ' CARDS'
+      elseif current.phase == 'kitty' then
+        if (current.kittyHolder or current.dealer) == 1 then
+          phaseLine.Text = 'BURY ' .. #selectedList() .. ' / ' .. current.kittySize .. ' CARDS'
+        else
+          phaseLine.Text = arenaUI.role(current.kittyHolder or current.dealer, true) .. ' IS BURYING THE KITTY…'
+        end
       elseif current.phase == 'chaodi' then
         local multStr = '×' .. (current.chaodiMultiplier or 1)
         if current.chaodiTurn == 1 then

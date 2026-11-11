@@ -161,6 +161,9 @@ end
 -- A fresh round, so Ben has turns left for two timeouts (topped up: lost rounds cost coins).
 _G.sessions[ana].coins, _G.sessions[ben].coins = 10000, 10000
 command(ana, 'start')
+-- Start Ben's count from zero: an earlier section may already have timed him out once.
+local benTable = _G.sessions[ben].table
+benTable.timeouts, benTable.away = nil, nil
 local awayChecked = false
 if untilBensTurn() then
   now = now + 26

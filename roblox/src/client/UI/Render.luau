@@ -192,7 +192,7 @@ C.render = function()
   else
     -- Whose turn it is already shows in the phase line, so only coach on yours.
     local turnText = current.turn == 1 and 'Your turn. Follow the led suit; level cards and jokers are trump.' or ''
-    notice.Text = C.state.message or (current.phase == 'declaration' and 'Declare trump with your level cards.' or (current.phase == 'kitty' and ('Choose ' .. current.kittySize .. ' cards for the kitty.') or turnText))
+    notice.Text = C.state.message or (current.phase == 'declaration' and 'Declare trump with your level cards.' or (current.phase == 'kitty' and ((current.kittyHolder or current.dealer) == 1 and ('Choose ' .. current.kittySize .. ' cards for the kitty.') or (arenaUI.role(current.kittyHolder or current.dealer) .. ' is burying the kitty…')) or turnText))
   end
 
   -- Center Dealing Deck visual on table during dealing

@@ -40,8 +40,8 @@ for _,role in ipairs({'A','B'}) do
   assert(#state.hands[1]==3 and state.penaltyPoints==(role=='A' and 20 or -20))
   assert(S.homogeneous({state.hands[1][1],state.hands[1][2]},state.trump).multiplicity==2)
 end
--- A successful pair+single gamble can be overtaken by any comparable component,
--- even if the new pair loses to the old pair (D10).
+-- A successful pair+single gamble answered by another pair+single (D10, as
+-- refined for Roblox by D16).
 local lead=cards({'A','A','K'})
 local previous=cards({'K','K','3'},'spades')
 local challenger=cards({'Q','Q','A'},'spades')
@@ -51,9 +51,11 @@ assert(#state.trick[1].cards==3 and state.penaltyPoints==0)
 assert(Practice.play(state,2,ids(previous)))
 assert(state.winnerSeat==2)
 assert(Practice.play(state,3,ids(challenger)))
-assert(state.winnerSeat==3)
+-- Roblox D16: throws are decided by their largest piece, so QQ (lower than KK)
+-- loses even though its stray ace beats the stray 3.
+assert(state.winnerSeat==2)
 assert(Practice.play(state,4,ids(state.hands[4])))
-assert(state.done and state.lastWinnerSeat==3)
+assert(state.done and state.lastWinnerSeat==2)
 -- Final gamble uses its largest winning component for kitty multiplier.
 local pairLow=cards({'3','3','4'})
 state=fixture({pairLow,cards({'A','A','K'},'spades'),cards({'5','5','6'},'hearts'),cards({'7','7','8'},'diamonds')})
