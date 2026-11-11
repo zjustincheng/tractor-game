@@ -377,6 +377,13 @@ return function(Cards, S, Rules, Scoring, Trained)
     if state.phase ~= 'chaodi' or isHuman(state, state.chaodiTurn) then return false end
     local seat = state.chaodiTurn
     local choice = Practice.chooseChaodi(state, seat)
+    -- A trained bot that learned Chao Di makes its own call.
+    if useTrained(state, seat) and Trained.usesChaodi and Trained.usesChaodi() then
+      local calls = Practice.chaodiOptions(state, seat)
+      local sameTeam = Cards.team(seat) == Cards.team(state.kittyHolder or state.dealer)
+      local picked, ok = trained(Trained.chooseChaodi, calls, state.hands[seat], state.trump, sameTeam, choice)
+      if ok then choice = picked end
+    end
     if choice then return Practice.chaodi(state, seat, choice, now) end
     return Practice.chaodiPass(state, seat, now)
   end

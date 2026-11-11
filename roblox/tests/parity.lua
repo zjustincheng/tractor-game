@@ -102,6 +102,10 @@ for i,f in ipairs(policy.leads) do
   matchesChampion(Trained.chooseLead(f.hand,f.trump,f.context),f.champion,'champion lead '..i)
   sameCards(Rules.choose(f.hand,nil,f.trump,f.context),f.roblox,'roblox lead '..i)
 end
+for i,f in ipairs(policy.chaodi or {}) do
+  sameOptions(Trained.chaodiOptions(f.calls,f.hand,f.trump,f.sameTeam,f.heuristic),f.options,'chaodi policy '..i)
+  equal(Trained.chooseChaodi(f.calls,f.hand,f.trump,f.sameTeam,f.heuristic,f.models) or 0,f.expected,'chaodi policy choice '..i)
+end
 for i,f in ipairs(policy.plays) do
   sameOptions(Trained.playOptions(f.hand,f.lead,f.trump,f.context),f.options,'play '..i)
   equal(Trained.choosePlay(f.hand,f.lead,f.trump,f.context,f.models),f.expected,'play choice '..i)
@@ -119,5 +123,5 @@ for i,f in ipairs(policy.declarations) do
   equal(index(Trained.chooseDeclaration(f.options,f.hand,f.level,f.models)),f.expected,'declaration choice '..i)
   matchesChampion(index(Trained.chooseDeclaration(f.options,f.hand,f.level)),f.champion,'champion declaration '..i)
 end
-print('PASS: trained bot port: '..#policy.leads..' leads, '..#policy.plays..' follows, '..#policy.burials..' burials, '..#policy.declarations..' declarations; '..champions..' champion choices')
+print('PASS: trained bot port: '..#(policy.chaodi or {})..' Chao Di decisions, '..#policy.leads..' leads, '..#policy.plays..' follows, '..#policy.burials..' burials, '..#policy.declarations..' declarations; '..champions..' champion choices')
 print('PASS: website/native parity: '..#fixtures.chaodi..' Chao Di hands ('..chaodiCalls..' calls), '..#fixtures.declarations..' declaration sets, '..#fixtures.structures..' structures, '..#fixtures.follows..' follows, '..#fixtures.gambles..' gambles, '..#fixtures.winners..' winners, '..#fixtures.settlements..' settlements, '..#fixtures.rounds..' complete rounds / '..total..' commands')

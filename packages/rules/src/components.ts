@@ -140,6 +140,22 @@ export function decomposeLead(
 }
 
 /** Find disjoint components of the requested shapes. Larger source sets may be protected. */
+// Same ordering as largestComponent in gamble.ts (kept here to avoid an import cycle).
+function largestOf(components: readonly Component[]): Component | undefined {
+  let best: Component | undefined;
+  for (const component of components)
+    if (
+      !best ||
+      component.multiplicity > best.multiplicity ||
+      (component.multiplicity === best.multiplicity &&
+        (component.rankCount > best.rankCount ||
+          (component.rankCount === best.rankCount &&
+            component.highestPower > best.highestPower)))
+    )
+      best = component;
+  return best;
+}
+
 export function matchComponents(
   cards: readonly Card[],
   shapes: readonly Shape[],
@@ -148,6 +164,8 @@ export function matchComponents(
     protectLargerSets?: boolean;
     requireAllCards?: boolean;
     mustBeat?: readonly Component[];
+    /** Roblox (D16): only the largest piece (searched first) can beat mustBeat. */
+    largestPatternWins?: boolean;
   } = {},
 ): Component[] | null {
   const ordered = [...shapes].sort(
@@ -191,14 +209,17 @@ export function matchComponents(
         )
       )
         continue;
-      const beats =
-        options.mustBeat?.some(
-          (current) =>
-            sameShape(candidate, current) &&
-            (candidate.category === current.category
-              ? candidate.highestPower > current.highestPower
-              : candidate.category === 'trump'),
-        ) ?? false;
+      const beatsOne = (current: Component) =>
+        sameShape(candidate, current) &&
+        (candidate.category === current.category
+          ? candidate.highestPower > current.highestPower
+          : candidate.category === 'trump');
+      const target = options.largestPatternWins
+        ? largestOf(options.mustBeat ?? [])
+        : undefined;
+      const beats = options.largestPatternWins
+        ? index === 0 && target !== undefined && beatsOne(target)
+        : (options.mustBeat?.some(beatsOne) ?? false);
       const rest = search(
         withoutCards(remaining, candidate.cards),
         index + 1,

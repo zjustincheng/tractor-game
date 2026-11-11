@@ -747,6 +747,37 @@ return function(Cards, S, Rules, Model)
     return list[best((models or Model).follow, list)].choice
   end
 
+  -- Roblox Chao Di: each legal call, then passing. The game's own rule
+  -- (`heuristic`, an index or nil) is the baseline. Matches chaodiPolicyOptions
+  -- in backend/src/training/learned-policy.ts.
+  function Trained.chaodiOptions(calls, hand, trump, sameTeam, heuristic)
+    local function trumps(suit)
+      return count(hand, function(card) return isTrump(card, { level = trump.level, suit = suit }) end)
+    end
+    local now = trumps(trump.suit)
+    local options = {}
+    for index, call in ipairs(calls) do
+      local after = trumps(call.suit)
+      table.insert(options, {
+        cardIds = call.cardIds,
+        prior = heuristic == index and BASELINE_PRIOR or 0,
+        features = { 0, #hand / 30, number(call.joker ~= nil), call.count / 5, after / math.max(1, #hand),
+          (after - now) / 10, number(sameTeam), number(call.joker == 'big') },
+      })
+    end
+    table.insert(options, { cardIds = {}, prior = heuristic == nil and BASELINE_PRIOR or 0, features = {} })
+    return options
+  end
+  -- The index of the call to make, or nil to pass.
+  function Trained.chooseChaodi(calls, hand, trump, sameTeam, heuristic, models)
+    if #calls == 0 then return nil end
+    local chosen = best((models or Model).follow, Trained.chaodiOptions(calls, hand, trump, sameTeam, heuristic))
+    if chosen <= #calls then return chosen end
+    return nil
+  end
+  -- Only models trained to make Chao Di calls make them; others keep the game's rule.
+  function Trained.usesChaodi(models) return (models or Model).robloxChaodi == true end
+
   function Trained.chooseBurial(cards, size, trump, models)
     local options = Trained.burialOptions(cards, size, trump)
     return options[best((models or Model).follow, options)].cardIds

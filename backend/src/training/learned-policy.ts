@@ -13,6 +13,8 @@ import {
   teamAt,
 } from '@tractor/rules';
 import { robloxBurial } from './roblox-bot.js';
+import { chooseRobloxChaodi } from './roblox-rules.js';
+import type { ChaodiCall } from './roblox-rules.js';
 import type {
   BotLeadContext,
   BotPlayContext,
@@ -448,7 +450,9 @@ export function playOptions(
         Number(cards.every((card) => category(card, trump) !== ledCategory)),
         Number(
           matchesLead &&
-            winningComponents(cards, lead, context.winning, trump) !== null &&
+            winningComponents(cards, lead, context.winning, trump, {
+              largestPatternWins: context.largestPatternWins === true,
+            }) !== null &&
             (context.trickPoints ?? 0) > 0 &&
             (context.opponentsRemaining ?? Number(!context.lastToPlay)) > 0 &&
             teamAt(context.seat) !== teamAt(context.winnerSeat),
@@ -468,7 +472,9 @@ export function playOptions(
           )) / 100,
         Number(
           matchesLead &&
-            winningComponents(cards, lead, context.winning, trump) !== null,
+            winningComponents(cards, lead, context.winning, trump, {
+              largestPatternWins: context.largestPatternWins === true,
+            }) !== null,
         ),
         (context.opponentsRemaining ?? Number(!context.lastToPlay)) / 5,
         Number(
@@ -481,7 +487,9 @@ export function playOptions(
         ),
         (Number(
           matchesLead &&
-            winningComponents(cards, lead, context.winning, trump) !== null,
+            winningComponents(cards, lead, context.winning, trump, {
+              largestPatternWins: context.largestPatternWins === true,
+            }) !== null,
         ) *
           (context.trickPoints ?? 0)) /
           100,
@@ -871,6 +879,77 @@ export function choosePolicyBurial(
   }
   record?.({ options, chosen, temperature });
   return options[chosen]!.cardIds;
+}
+
+/**
+ * Options for a Roblox Chao Di decision: each legal call, then passing. The
+ * game's own rule (chooseRobloxChaodi) is the baseline the policy starts from.
+ * Mirrored by Trained.chaodiOptions in roblox/src/server/TrainedBots.luau.
+ */
+export function chaodiPolicyOptions(
+  calls: readonly ChaodiCall[],
+  hand: readonly Card[],
+  trump: Trump,
+  sameTeamAsHolder: boolean,
+): LeadOption[] {
+  const heuristic = chooseRobloxChaodi(calls, hand, trump, sameTeamAsHolder);
+  const trumps = (suit: Trump['suit']) =>
+    hand.filter(
+      (card) => category(card, { level: trump.level, suit }) === 'trump',
+    ).length;
+  const now = trumps(trump.suit);
+  const options: LeadOption[] = calls.map((call, index) => {
+    const after = trumps(call.suit);
+    const features = Array<number>(INPUTS).fill(0);
+    features[1] = hand.length / 30;
+    features[2] = Number(call.joker !== undefined);
+    features[3] = call.count / 5;
+    features[4] = after / Math.max(1, hand.length);
+    features[5] = (after - now) / 10;
+    features[6] = Number(sameTeamAsHolder);
+    features[7] = Number(call.joker === 'big');
+    return {
+      cardIds: [...call.cardIds],
+      prior: heuristic === index ? BASELINE_PRIOR : 0,
+      features,
+    };
+  });
+  options.push({
+    cardIds: [],
+    prior: heuristic === null ? BASELINE_PRIOR : 0,
+    features: Array<number>(INPUTS).fill(0),
+  });
+  return options;
+}
+
+/** A learned Chao Di decision: the index of the call to make, or null to pass. */
+export function choosePolicyChaodi(
+  model: PolicyModel,
+  calls: readonly ChaodiCall[],
+  hand: readonly Card[],
+  trump: Trump,
+  sameTeamAsHolder: boolean,
+  pick?: (max: number) => number,
+  record?: (experience: PolicyExperience) => void,
+): number | null {
+  if (!calls.length) return null;
+  const options = chaodiPolicyOptions(calls, hand, trump, sameTeamAsHolder);
+  const temperature = pick ? EXPLORATION_TEMPERATURE : 1;
+  const probabilities = policyProbabilities(model, options, temperature);
+  let chosen = probabilities.indexOf(Math.max(...probabilities));
+  if (pick) {
+    const draw = pick(0x100000000) / 0x100000000;
+    let sum = 0;
+    for (let index = 0; index < probabilities.length; index++) {
+      sum += probabilities[index]!;
+      if (draw < sum) {
+        chosen = index;
+        break;
+      }
+    }
+  }
+  record?.({ options, chosen, temperature });
+  return chosen < calls.length ? chosen : null;
 }
 
 export function emptyGradient(): PolicyModel {

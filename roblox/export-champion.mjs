@@ -36,6 +36,8 @@ return {
   source = '${source}',
   generation = ${checkpoint.generation},
   policyVersion = '${checkpoint.policyVersion}',
+  -- Trained to make its own Chao Di calls (otherwise the game's rule decides).
+  robloxChaodi = ${checkpoint.robloxChaodi === true},
   lead = ${model(lead)},
   follow = ${model(follow)},
 }

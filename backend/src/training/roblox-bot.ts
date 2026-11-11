@@ -114,7 +114,9 @@ export function robloxFollow(
     if (!follow.legal) return [999999, 999999, 999999];
     const wins =
       follow.matchesLead &&
-      winningComponents(cards, lead, context.winning, trump) !== null;
+      winningComponents(cards, lead, context.winning, trump, {
+        largestPatternWins: context.largestPatternWins === true,
+      }) !== null;
     const points = cards.reduce((n, c) => n + cardPoints(c), 0);
     const strength = cards.reduce(
       (n, c) =>

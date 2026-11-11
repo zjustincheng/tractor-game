@@ -215,7 +215,9 @@ export function summarizeFollows(
       wins:
         follow.legal &&
         follow.matchesLead &&
-        winningComponents(cards, lead, context.winning, trump) !== null,
+        winningComponents(cards, lead, context.winning, trump, {
+          largestPatternWins: context.largestPatternWins === true,
+        }) !== null,
       big: hasBigJoker(cards),
       joker: hasJoker(cards),
       power: power(cards, trump),

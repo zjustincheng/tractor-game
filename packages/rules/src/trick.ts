@@ -26,6 +26,8 @@ export interface TrickState {
   readonly penaltyPoints: number;
   readonly capturedDefenderPoints: number;
   readonly trickPoints: number;
+  /** Roblox (D16): a thrown combination is won or lost on its largest piece. */
+  readonly largestPatternWins?: boolean;
 }
 
 export type PlayError =
@@ -50,6 +52,7 @@ export function startTrick(input: {
   attackingTeam: Team;
   leaderSeat: number;
   hands: readonly (readonly Card[])[];
+  largestPatternWins?: boolean;
 }): TrickState {
   const { playerCount, hands, leaderSeat } = input;
   const config = gameConfig(playerCount);
@@ -154,6 +157,7 @@ export function playCards(
           state.plays[0]!.components!,
           currentWinner.components!,
           state.trump,
+          { largestPatternWins: state.largestPatternWins === true },
         )
       : null;
   if (winningPartition) components = winningPartition;
@@ -203,5 +207,6 @@ export function nextTrick(state: TrickState): TrickState {
     attackingTeam: state.attackingTeam,
     leaderSeat: state.winnerSeat,
     hands: state.hands,
+    ...(state.largestPatternWins ? { largestPatternWins: true } : {}),
   });
 }

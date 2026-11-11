@@ -147,6 +147,10 @@ In Roblox, four of a kind can answer and beat a lead of one 4-card tractor (two 
 
 In Roblox, each overturn during declaration that changes the trump suit, or changes to or from no-trump, doubles the round's stake multiplier, the same as a successful Chao Di. The first declaration, a stronger reveal of the same suit, and small jokers to big jokers do not change it.
 
+### D16 — Roblox Throws Are Decided by Their Largest Piece
+
+In Roblox, when a thrown combination (a gamble with several pieces) is answered by a matching combination, only the largest piece of each is compared: most cards per rank first, then the longest run, then the highest card. The answer wins only if its largest piece has the same shape and is higher (or is trump against a non-trump lead). A higher stray single or a smaller piece can no longer take the trick. The website keeps comparing every piece. Training uses this rule whenever it runs Roblox rules (`largestPatternWins` in the rules package).
+
 ## Remaining Decisions
 
 The unresolved details above and the timing cases listed in [the roadmap](../ROADMAP.md) need concrete examples before dependent rules are implemented.

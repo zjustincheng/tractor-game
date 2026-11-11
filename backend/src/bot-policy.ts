@@ -4,7 +4,8 @@ import {
   chooseBotOpeningLead,
   chooseBotPlay,
 } from '@tractor/rules';
-import type { BotDifficulty, Card } from '@tractor/rules';
+import type { BotDifficulty, Card, Trump } from '@tractor/rules';
+import type { ChaodiCall } from './training/roblox-rules.js';
 import type { LeadPolicy, PolicyModel } from './training/learned-policy.js';
 import type { BotMatch } from './bot-match.js';
 
@@ -26,6 +27,13 @@ export interface BotPolicy {
   follow: typeof chooseBotPlay;
   declare: typeof chooseBotDeclaration;
   bury: typeof chooseBotBurial;
+  /** Roblox Chao Di: index of the call to make, or null to pass. */
+  chaodi?: (
+    calls: readonly ChaodiCall[],
+    hand: readonly Card[],
+    trump: Trump,
+    sameTeamAsHolder: boolean,
+  ) => number | null;
 }
 
 export function heuristicPolicy(difficulty: BotDifficulty): BotPolicy {

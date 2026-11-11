@@ -40,6 +40,10 @@ import {
   chaodiOptions,
   chooseRobloxChaodi,
 } from '../../backend/src/training/roblox-rules.ts';
+import {
+  chaodiPolicyOptions,
+  choosePolicyChaodi,
+} from '../../backend/src/training/learned-policy.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
@@ -179,7 +183,9 @@ for (const [previous, challenger] of [
     lead: gambleLead,
     current,
     trump,
-    expected: winningComponents(hand, gambleLead, current, trump),
+    expected: winningComponents(hand, gambleLead, current, trump, {
+      largestPatternWins: true,
+    }),
   });
 }
 const twoPairs = decomposeLead(cards(['4', '4', 'K', 'K'], 'spades'), trump);
@@ -189,7 +195,9 @@ fixtures.winners.push({
   lead: twoPairs,
   current: twoPairs,
   trump,
-  expected: winningComponents(challenger, twoPairs, twoPairs, trump),
+  expected: winningComponents(challenger, twoPairs, twoPairs, trump, {
+    largestPatternWins: true,
+  }),
 });
 // Random category samples exercise decomposition and legal/illegal partial follows.
 for (let i = 0; i < 140; i++) {
@@ -226,6 +234,7 @@ for (const playerCount of [4, 6, 8, 10])
       playerCount,
     );
     let state = startTrick({
+      largestPatternWins: true,
       playerCount,
       trump: t,
       attackingTeam: 'A',
@@ -453,6 +462,50 @@ const randomModels = () => {
   };
   return { lead: make(), follow: make() };
 };
+
+// Learned Chao Di decisions with random models, as the game scores them.
+fixtures.policy.chaodi = [];
+for (let i = 0; i < 120; i++) {
+  const playerCount = [4, 6][i % 2];
+  const level = ['2', '7', 'K'][i % 3];
+  const { hands } = deal(shuffle(createDeck(playerCount), pick), playerCount);
+  const current = {
+    kind: 'suit',
+    playerSeat: 2,
+    level,
+    suit: 'clubs',
+    multiplicity: i % 2 ? 1 : 2,
+    cardIds: [],
+  };
+  const trump = { level, suit: 'clubs' };
+  const calls = chaodiOptions(hands[0], level, current, 0);
+  if (!calls.length) continue;
+  const models = randomModels();
+  for (const sameTeam of [true, false]) {
+    const heuristic = chooseRobloxChaodi(calls, hands[0], trump, sameTeam);
+    const chosen = choosePolicyChaodi(
+      models.follow,
+      calls,
+      hands[0],
+      trump,
+      sameTeam,
+    );
+    fixtures.policy.chaodi.push({
+      hand: hands[0],
+      trump,
+      sameTeam,
+      calls: calls.map((call) => ({
+        count: call.count,
+        cardIds: call.cardIds,
+        ...(call.suit ? { suit: call.suit } : { joker: call.joker }),
+      })),
+      heuristic: heuristic === null ? undefined : heuristic + 1,
+      models,
+      options: options(chaodiPolicyOptions(calls, hands[0], trump, sameTeam)),
+      expected: chosen === null ? 0 : chosen + 1,
+    });
+  }
+}
 const championSource = /source = '([^']+)'/.exec(
   readFileSync(
     new URL('../src/server/ChampionModel.luau', import.meta.url),
@@ -547,6 +600,7 @@ for (const playerCount of [4, 6, 8, 10])
       });
     }
     let state = startTrick({
+      largestPatternWins: true,
       playerCount,
       trump: t,
       attackingTeam: 'A',
@@ -644,6 +698,7 @@ for (let i = 0; i < 40; i++) {
     trickPoints: i % 3 === 0 ? 0 : 15,
     opponentsRemaining: ace ? 0 : 1,
     dealerSeat: 2,
+    largestPatternWins: true, // the game always uses D16
   };
   fixtures.policy.plays.push({
     hand,

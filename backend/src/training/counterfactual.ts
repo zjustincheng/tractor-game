@@ -200,6 +200,7 @@ function rolloutRoundInternal(
       trump: trick.trump,
       attackingTeam: trick.attackingTeam,
       leaderSeat: trick.winnerSeat!,
+      ...(trick.largestPatternWins ? { largestPatternWins: true } : {}),
     });
   }
   const winning = trick.plays.find((p) => p.seat === trick.winnerSeat)!;

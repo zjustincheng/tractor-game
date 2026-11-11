@@ -63,9 +63,28 @@ export function validateGamble(
 }
 
 /** Compare only responses already matched to the entire lead. Any comparable component may beat. */
+/** The biggest piece of a play: most cards per rank, then longest run, then highest card. */
+export function largestComponent(
+  components: readonly Component[],
+): Component | undefined {
+  let best: Component | undefined;
+  for (const component of components)
+    if (
+      !best ||
+      component.multiplicity > best.multiplicity ||
+      (component.multiplicity === best.multiplicity &&
+        (component.rankCount > best.rankCount ||
+          (component.rankCount === best.rankCount &&
+            component.highestPower > best.highestPower)))
+    )
+      best = component;
+  return best;
+}
+
 export function beatsPlay(
   challenger: readonly Component[],
   current: readonly Component[],
+  options: { largestPatternWins?: boolean } = {},
 ): boolean {
   const shapeKey = (component: Component) =>
     `${component.multiplicity}:${component.rankCount}`;
@@ -92,6 +111,18 @@ export function beatsPlay(
     current.map(strengthKey).sort().join('|')
   )
     return false;
+  // Roblox (D16): only the largest pieces are compared, so a weaker throw can
+  // no longer take the trick on a high stray single.
+  if (options.largestPatternWins) {
+    const mine = largestComponent(challenger);
+    const theirs = largestComponent(current);
+    return (
+      !!mine &&
+      !!theirs &&
+      sameShape(mine, theirs) &&
+      mine.highestPower > theirs.highestPower
+    );
+  }
   return challenger.some((component) =>
     current.some(
       (incumbent) =>
@@ -107,12 +138,13 @@ export function winningComponents(
   lead: readonly Component[],
   current: readonly Component[],
   trump: Trump,
+  options: { largestPatternWins?: boolean } = {},
 ): Component[] | null {
   const firstMatch = matchComponents(cards, lead, trump, {
     requireAllCards: true,
   });
   if (!firstMatch) return null;
-  if (beatsPlay(firstMatch, current)) return firstMatch;
+  if (beatsPlay(firstMatch, current, options)) return firstMatch;
   const powers = (items: readonly Card[]) =>
     items
       .map((card) => `${category(card, trump)}:${effectivePower(card, trump)}`)
@@ -123,5 +155,6 @@ export function winningComponents(
   return matchComponents(cards, lead, trump, {
     requireAllCards: true,
     mustBeat: current,
+    largestPatternWins: options.largestPatternWins === true,
   });
 }

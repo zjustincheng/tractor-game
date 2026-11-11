@@ -181,6 +181,8 @@ Update 2026-11-10: the Roblox suites run again under Fengari. `server.lua`, `tab
 
 Roblox-rules training runs the game's Chao Di round after burial (`playRobloxChaodi` in `backend/src/training/roblox-rules.ts`, covered by `roblox-rules.test.ts`), and `roblox/tests/parity.mjs` checks its call options and bot choices against `Practice.luau` on 320 hands. Chao Di choices still use the game's heuristic for every seat; the trained bot re-buries and plays under the new trump. Quads are not modelled in training: they need four decks, and training runs at four and six players. The Roblox re-test before promotion plays twice the usual deals and is recorded in the report.
 
+`packages/rules/src/trick.test.ts` covers the Roblox-only largest-piece comparison for throws (D16), and `roblox/tests/parity.mjs` checks trick winners, follow features and complete rounds against the game with it on. Learned Chao Di decisions (`choosePolicyChaodi`) are checked against `Trained.chooseChaodi` on random models; the game uses them only for models exported with `robloxChaodi`.
+
 # Roblox foundation
 
 `roblox/tests/practice.lua` exercises the native pure Lua-compatible card and

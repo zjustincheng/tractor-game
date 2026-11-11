@@ -23,5 +23,6 @@ export function botPlayContext(
         index !== seat && !played.has(index) && teamAt(index) !== teamAt(seat),
     ).length,
     ...(dealerSeat === undefined ? {} : { dealerSeat }),
+    ...(trick.largestPatternWins ? { largestPatternWins: true } : {}),
   };
 }

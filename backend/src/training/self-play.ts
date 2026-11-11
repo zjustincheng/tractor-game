@@ -27,6 +27,7 @@ import type {
   PlayerCount,
   RoundSettlement,
   Team,
+  TrickState,
   Trump,
 } from '@tractor/rules';
 import { legalDeclarations } from '../bot-match.js';
@@ -113,6 +114,9 @@ export function playTrainingMatch(options: {
   >;
   /** Overrides every seat's Chao Di choice (tests); the Roblox heuristic otherwise. */
   chaodiDecision?: Parameters<typeof playRobloxChaodi>[1];
+  /** Per-team Chao Di choices; the Roblox heuristic when absent. */
+  candidateChaodi?: NonNullable<BotPolicy['chaodi']>;
+  opponentChaodi?: NonNullable<BotPolicy['chaodi']>;
   /** Told about every Chao Di call (Roblox rules only). */
   onChaodi?: (call: ChaodiCall) => void;
   onRound?: (
@@ -211,8 +215,13 @@ export function playTrainingMatch(options: {
       state = playRobloxChaodi(
         state,
         options.chaodiDecision ??
-          ((_, calls, hand, trump, sameTeam) =>
-            chooseRobloxChaodi(calls, hand, trump, sameTeam)),
+          ((seat, calls, hand, trump, sameTeam) =>
+            (
+              (teamAt(seat) === options.candidateTeam
+                ? (options.candidatePolicy?.chaodi ?? options.candidateChaodi)
+                : (options.opponentPolicy?.chaodi ?? options.opponentChaodi)) ??
+              chooseRobloxChaodi
+            )(calls, hand, trump, sameTeam)),
         (seat, cards, size, trump) =>
           (
             (teamAt(seat) === options.candidateTeam
@@ -225,7 +234,10 @@ export function playTrainingMatch(options: {
           options.onChaodi?.(call);
         },
       );
-    let trick = state.trick!;
+    // Roblox (D16): throws are won or lost on their largest piece.
+    let trick: TrickState = options.robloxRules
+      ? { ...state.trick!, largestPatternWins: true }
+      : state.trick!;
     let captured = 0;
     let penalties = 0;
     let trickNumber = 1;
@@ -334,6 +346,7 @@ export function playTrainingMatch(options: {
         trump: trick.trump,
         attackingTeam: state.attackingTeam,
         leaderSeat: trick.winnerSeat!,
+        ...(options.robloxRules ? { largestPatternWins: true } : {}),
       });
       trickNumber++;
     }

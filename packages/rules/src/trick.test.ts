@@ -289,6 +289,33 @@ describe('gamble validation and comparison (D4, D9, D10)', () => {
     expect(result.cards).toHaveLength(1);
     expect(result.cards[0]).toMatchObject({ rank: '3' });
   });
+  it('with largestPatternWins (Roblox D16) only the largest pieces decide', () => {
+    const roblox = { largestPatternWins: true };
+    // A higher stray single no longer steals the trick from a higher pair.
+    expect(
+      beatsPlay(
+        components('Q Q A', 'spades'),
+        components('K K 3', 'spades'),
+        roblox,
+      ),
+    ).toBe(false);
+    // A higher largest piece still wins, whatever the smaller pieces are.
+    expect(
+      beatsPlay(
+        components('A A 3', 'spades'),
+        components('K K Q', 'spades'),
+        roblox,
+      ),
+    ).toBe(true);
+    // Two pairs: the higher pair decides, so a higher low pair is not enough.
+    expect(
+      beatsPlay(
+        components('3 3 Q Q', 'spades'),
+        components('4 4 K K', 'spades'),
+        roblox,
+      ),
+    ).toBe(false);
+  });
   it('a higher single beats despite a losing pair', () => {
     expect(
       beatsPlay(components('Q Q A', 'spades'), components('K K 3', 'spades')),

@@ -1,10 +1,13 @@
 import { chooseBotPlay } from '@tractor/rules';
+import type { Card, Trump } from '@tractor/rules';
+import type { ChaodiCall } from './roblox-rules.js';
 import type { BotPolicy } from '../bot-policy.js';
 import {
   choosePolicyLead,
   choosePolicyPlay,
   choosePolicyDeclaration,
   choosePolicyBurial,
+  choosePolicyChaodi,
 } from './learned-policy.js';
 import type { PolicyModel, PolicyExperience } from './learned-policy.js';
 export function learnedBotPolicy(
@@ -15,8 +18,9 @@ export function learnedBotPolicy(
     follow?: (experience: PolicyExperience) => void;
     declaration?: (experience: PolicyExperience) => void;
     burial?: (experience: PolicyExperience) => void;
+    chaodi?: (experience: PolicyExperience) => void;
   } = {},
-  options: { robloxRules?: boolean } = {},
+  options: { robloxRules?: boolean; robloxChaodi?: boolean } = {},
 ): BotPolicy {
   return {
     lead: (hand, trump, context) =>
@@ -49,6 +53,25 @@ export function learnedBotPolicy(
         undefined,
         record.declaration,
       ),
+    ...(options.robloxChaodi
+      ? {
+          chaodi: (
+            calls: readonly ChaodiCall[],
+            hand: readonly Card[],
+            trump: Trump,
+            sameTeam: boolean,
+          ) =>
+            choosePolicyChaodi(
+              follow,
+              calls,
+              hand,
+              trump,
+              sameTeam,
+              undefined,
+              record.chaodi,
+            ),
+        }
+      : {}),
     bury: (cards, size, trump) =>
       choosePolicyBurial(
         follow,

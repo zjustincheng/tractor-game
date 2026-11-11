@@ -5,6 +5,7 @@ import {
   choosePolicyLead,
   choosePolicyDeclaration,
   choosePolicyBurial,
+  choosePolicyChaodi,
   choosePolicyPlay,
   newPolicy,
   parsePolicy,
@@ -291,6 +292,8 @@ export interface PolicyCheckpoint {
   sharpGate?: boolean;
   /** Train on the Roblox game's rules and practice more against its bots. */
   robloxRules?: boolean;
+  /** Its bots make their own Chao Di calls; exported for the game. */
+  robloxChaodi?: boolean;
   /** Best learner so far against the Roblox bots, while there is no champion. */
   robloxGuard?: RobloxGuard;
   nonPromotionStreak?: number;
@@ -432,6 +435,7 @@ export function parsePolicyCheckpoint(value: unknown): PolicyCheckpoint {
     archive: checkpoint.archive.map(parsePolicy),
     sharpGate: checkpoint.sharpGate ?? true,
     ...(checkpoint.robloxRules === true ? { robloxRules: true } : {}),
+    ...(checkpoint.robloxChaodi === true ? { robloxChaodi: true } : {}),
     ...(checkpoint.robloxGuard
       ? { robloxGuard: parseRobloxGuard(checkpoint.robloxGuard) }
       : {}),
@@ -879,6 +883,20 @@ export function trainPolicyGeneration(
               pick,
               (experience) => followExperiences.push(experience),
             ),
+          ...(checkpoint.robloxRules === true
+            ? {
+                candidateChaodi: (calls, hand, trump, sameTeam) =>
+                  choosePolicyChaodi(
+                    followBase,
+                    calls,
+                    hand,
+                    trump,
+                    sameTeam,
+                    pick,
+                    (experience) => followExperiences.push(experience),
+                  ),
+              }
+            : {}),
           candidateBurial: (cards, size, trump) =>
             choosePolicyBurial(
               followBase,
@@ -1060,24 +1078,31 @@ export function trainPolicyGeneration(
         lead: record(leadLearner),
         follow: record(followLearner),
       },
-      { robloxRules: checkpoint.robloxRules === true },
+      {
+        robloxRules: checkpoint.robloxRules === true,
+        robloxChaodi: checkpoint.robloxRules === true,
+      },
     );
     const matches: SelfPlayResult[] = [];
     for (const playerCount of checkpoint.config.playerCounts) {
       // The Roblox re-test runs on twice as many fresh deals: a candidate is
       // only re-tested after a lucky first score, so a real but small edge
       // (about 55%) needs the larger sample to show above the noise.
+      // A Roblox run plays its champion every generation (for rollback), so
+      // that screen uses the usual deals; the promotion re-test stays large.
       const seedCount =
         phase === 'confirmation-roblox'
           ? checkpoint.config.validationSeeds * ROBLOX_CONFIRMATION_FACTOR
-          : phase.includes('champion')
-            ? checkpoint.config.validationSeeds >= 128
-              ? Math.max(
-                  checkpoint.config.validationSeeds,
-                  PROMOTION_CHAMPION_SEEDS,
-                )
-              : checkpoint.config.validationSeeds
-            : checkpoint.config.validationSeeds;
+          : checkpoint.robloxRules === true && phase === 'validation-champion'
+            ? checkpoint.config.validationSeeds
+            : phase.includes('champion')
+              ? checkpoint.config.validationSeeds >= 128
+                ? Math.max(
+                    checkpoint.config.validationSeeds,
+                    PROMOTION_CHAMPION_SEEDS,
+                  )
+                : checkpoint.config.validationSeeds
+              : checkpoint.config.validationSeeds;
       for (const baseSeed of generationSeeds(
         checkpoint.config,
         generation,
@@ -1099,6 +1124,9 @@ export function trainPolicyGeneration(
             candidatePlay: evaluatedPolicy.follow,
             candidateDeclaration: evaluatedPolicy.declare,
             candidateBurial: evaluatedPolicy.bury,
+            ...(evaluatedPolicy.chaodi
+              ? { candidateChaodi: evaluatedPolicy.chaodi }
+              : {}),
             ...opponentPolicies(opponent),
           });
           matches.push(result);
@@ -1275,6 +1303,7 @@ export function trainPolicyGeneration(
   return {
     ...checkpoint,
     ...(robloxGuard ? { robloxGuard: robloxGuard.guard } : {}),
+    ...(checkpoint.robloxRules === true ? { robloxChaodi: true } : {}),
     generation,
     nonPromotionStreak: streakAfterGuard,
     generationsSincePromotion,

@@ -26,6 +26,8 @@ export interface BotPlayContext {
   winning: readonly Component[];
   lastToPlay: boolean;
   dealerSeat?: number;
+  /** Roblox (D16): throws are won or lost on their largest piece. */
+  largestPatternWins?: boolean;
 }
 
 export interface BotLeadContext {
@@ -552,7 +554,9 @@ function tacticalFollow(
     const wins =
       follow.legal &&
       follow.matchesLead &&
-      winningComponents(cards, lead, context.winning, trump) !== null;
+      winningComponents(cards, lead, context.winning, trump, {
+        largestPatternWins: context.largestPatternWins === true,
+      }) !== null;
     const points = cards.reduce((sum, card) => sum + cardPoints(card), 0);
     const strength = cards.reduce(
       (sum, card) =>
