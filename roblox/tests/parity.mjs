@@ -36,6 +36,10 @@ import {
 import { botPlayContext } from '../../backend/src/bot-play-context.ts';
 import { category, teamAt } from '../../packages/rules/src/cards.ts';
 import { chooseBotBurial } from '../../packages/rules/src/bot.ts';
+import {
+  chaodiOptions,
+  chooseRobloxChaodi,
+} from '../../backend/src/training/roblox-rules.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
@@ -362,6 +366,64 @@ for (const playerCount of [4, 6, 8, 10])
 // Trained-bot port: every input, baseline flag and final choice must match the
 // website, using random models and (when available locally) the real champion.
 fixtures.policy = { leads: [], plays: [], declarations: [], burials: [] };
+
+// Chao Di: the training port must offer and choose exactly what the game does.
+fixtures.chaodi = [];
+for (let i = 0; i < 160; i++) {
+  const playerCount = [4, 6, 8, 10][i % 4];
+  const level = ['2', '5', 'J'][i % 3];
+  const { hands } = deal(shuffle(createDeck(playerCount), pick), playerCount);
+  const hand = hands[0];
+  const currents = [
+    {
+      kind: 'suit',
+      playerSeat: 2,
+      level,
+      suit: 'hearts',
+      multiplicity: 1,
+      cardIds: [],
+    },
+    {
+      kind: 'suit',
+      playerSeat: 2,
+      level,
+      suit: 'diamonds',
+      multiplicity: 2,
+      cardIds: [],
+    },
+    {
+      kind: 'joker',
+      playerSeat: 2,
+      level,
+      joker: 'small',
+      multiplicity: 2,
+      cardIds: [],
+    },
+  ];
+  const current = currents[i % 3];
+  const trump = { level, suit: current.kind === 'suit' ? current.suit : null };
+  const calls = chaodiOptions(hand, level, current, 0);
+  for (const sameTeam of [true, false]) {
+    const choice = chooseRobloxChaodi(calls, hand, trump, sameTeam);
+    fixtures.chaodi.push({
+      hand,
+      playerCount,
+      trump,
+      current:
+        current.kind === 'suit'
+          ? { suit: current.suit, count: current.multiplicity }
+          : { joker: current.joker, count: current.multiplicity },
+      holder: sameTeam ? 3 : 2,
+      expectedOptions: calls.map((call) => ({
+        seat: 1,
+        count: call.count,
+        cardIds: call.cardIds,
+        ...(call.suit ? { suit: call.suit } : { joker: call.joker }),
+      })),
+      expectedChoice: choice === null ? 0 : choice + 1,
+    });
+  }
+}
 const seatContext = (context) => ({
   ...context,
   seat: context.seat + 1,

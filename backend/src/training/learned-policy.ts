@@ -754,9 +754,15 @@ export function choosePolicyBurial(
   if (robloxRules) {
     const key = (ids: readonly string[]) => [...ids].sort().join('|');
     const choices = robloxBurialChoices(cards, size, trump);
-    const options = [
-      ...new Map(choices.map((ids) => [key(ids), ids])).values(),
-    ].map((ids, index) => {
+    // Keep the first of any burials with the same cards, as the game does.
+    const seen = new Set<string>();
+    const distinct = choices.filter((ids) => {
+      const id = key(ids);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    const options = distinct.map((ids, index) => {
       const selected = cards.filter((card) => ids.includes(card.id));
       return {
         cardIds: ids,

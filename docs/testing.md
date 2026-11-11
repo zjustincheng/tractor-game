@@ -179,6 +179,8 @@ Policy evaluation tests cover promotion with a positive level interval and point
 
 Update 2026-11-10: the Roblox suites run again under Fengari. `server.lua`, `tables.lua`, `crossserver.lua` and `matchserver.lua` stub purchase, badge and analytics services; loops close the Double window; `setup`, `practice`, `moves` and `multiplayer` pin the 8-second declaration window they were written for. `tables.lua` covers away players (two timeouts in a row give a 3-second timer until they act). `client.lua` loads every UI module and checks the home screen, Money/Rank toggle and Friends page, then stops at its first in-game check (declaration buttons hidden in the harness); the rest of its scenario predates the current UI and still needs updating.
 
+Roblox-rules training runs the game's Chao Di round after burial (`playRobloxChaodi` in `backend/src/training/roblox-rules.ts`, covered by `roblox-rules.test.ts`), and `roblox/tests/parity.mjs` checks its call options and bot choices against `Practice.luau` on 320 hands. Chao Di choices still use the game's heuristic for every seat; the trained bot re-buries and plays under the new trump. Quads are not modelled in training: they need four decks, and training runs at four and six players. The Roblox re-test before promotion plays twice the usual deals and is recorded in the report.
+
 # Roblox foundation
 
 `roblox/tests/practice.lua` exercises the native pure Lua-compatible card and

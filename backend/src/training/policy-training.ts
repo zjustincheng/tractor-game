@@ -104,6 +104,8 @@ export const PROMOTION_CHAMPION_SEEDS = 512;
 export const MIN_CHAMPION_REGRESSION_MARGIN = 0.5;
 /** Point loss must be bounded, but point superiority is not required. */
 export const MAX_PROMOTION_POINT_REGRESSION = 0.01;
+/** The Roblox re-test plays this many times the usual validation deals. */
+export const ROBLOX_CONFIRMATION_FACTOR = 2;
 /** Generations a reset learner is left alone. Improving on a champion means
  * being allowed to be slightly worse on the way, and a reset also clears both
  * Adam moment estimates: without this, evidence rebuilds in two generations
@@ -1062,14 +1064,20 @@ export function trainPolicyGeneration(
     );
     const matches: SelfPlayResult[] = [];
     for (const playerCount of checkpoint.config.playerCounts) {
-      const seedCount = phase.includes('champion')
-        ? checkpoint.config.validationSeeds >= 128
-          ? Math.max(
-              checkpoint.config.validationSeeds,
-              PROMOTION_CHAMPION_SEEDS,
-            )
-          : checkpoint.config.validationSeeds
-        : checkpoint.config.validationSeeds;
+      // The Roblox re-test runs on twice as many fresh deals: a candidate is
+      // only re-tested after a lucky first score, so a real but small edge
+      // (about 55%) needs the larger sample to show above the noise.
+      const seedCount =
+        phase === 'confirmation-roblox'
+          ? checkpoint.config.validationSeeds * ROBLOX_CONFIRMATION_FACTOR
+          : phase.includes('champion')
+            ? checkpoint.config.validationSeeds >= 128
+              ? Math.max(
+                  checkpoint.config.validationSeeds,
+                  PROMOTION_CHAMPION_SEEDS,
+                )
+              : checkpoint.config.validationSeeds
+            : checkpoint.config.validationSeeds;
       for (const baseSeed of generationSeeds(
         checkpoint.config,
         generation,
@@ -1335,6 +1343,7 @@ export function trainPolicyGeneration(
                 baseline: confirmation.baseline,
                 champion: confirmation.champion,
                 sharp: confirmation.sharp,
+                roblox: confirmation.roblox,
               },
             }
           : {}),

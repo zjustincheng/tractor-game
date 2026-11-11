@@ -27,6 +27,15 @@ end
 for i,f in ipairs(fixtures.gambles) do equal(Rules.gamble(f.components,f.otherHands,f.trump,f.role),f.expected,'gamble' .. i) end
 for i,f in ipairs(fixtures.winners) do equal(Rules.winning(f.cards,f.lead,f.current,f.trump),f.expected,'winner' .. i) end
 for i,f in ipairs(fixtures.settlements) do equal(Scoring.settle(f.input),f.expected,'settlement' .. i) end
+-- Chao Di port used by training (backend/src/training/roblox-rules.ts).
+local chaodiCalls=0
+for i,f in ipairs(fixtures.chaodi) do
+  local hands={}; for seat=1,f.playerCount do hands[seat]={} end; hands[1]=f.hand
+  local state={phase='chaodi',hands=hands,trump=f.trump,declaration=f.current,playerCount=f.playerCount,kittyHolder=f.holder,dealer=f.holder}
+  equal(Practice.chaodiOptions(state,1),f.expectedOptions,'chaodi options '..i)
+  equal(Practice.chooseChaodi(state,1) or 0,f.expectedChoice,'chaodi choice '..i)
+  if f.expectedChoice>0 then chaodiCalls=chaodiCalls+1 end
+end
 local total=0
 for i,f in ipairs(fixtures.rounds) do
   local state=Practice.new(function(n)return n end,0,{playerCount=f.playerCount,levels={A=f.trump.level,B="2"}})
@@ -111,4 +120,4 @@ for i,f in ipairs(policy.declarations) do
   matchesChampion(index(Trained.chooseDeclaration(f.options,f.hand,f.level)),f.champion,'champion declaration '..i)
 end
 print('PASS: trained bot port: '..#policy.leads..' leads, '..#policy.plays..' follows, '..#policy.burials..' burials, '..#policy.declarations..' declarations; '..champions..' champion choices')
-print('PASS: website/native parity: '..#fixtures.declarations..' declaration sets, '..#fixtures.structures..' structures, '..#fixtures.follows..' follows, '..#fixtures.gambles..' gambles, '..#fixtures.winners..' winners, '..#fixtures.settlements..' settlements, '..#fixtures.rounds..' complete rounds / '..total..' commands')
+print('PASS: website/native parity: '..#fixtures.chaodi..' Chao Di hands ('..chaodiCalls..' calls), '..#fixtures.declarations..' declaration sets, '..#fixtures.structures..' structures, '..#fixtures.follows..' follows, '..#fixtures.gambles..' gambles, '..#fixtures.winners..' winners, '..#fixtures.settlements..' settlements, '..#fixtures.rounds..' complete rounds / '..total..' commands')

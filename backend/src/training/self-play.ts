@@ -30,7 +30,12 @@ import type {
   Trump,
 } from '@tractor/rules';
 import { legalDeclarations } from '../bot-match.js';
-import { robloxJokerPairs } from './roblox-rules.js';
+import {
+  chooseRobloxChaodi,
+  playRobloxChaodi,
+  robloxJokerPairs,
+} from './roblox-rules.js';
+import type { ChaodiCall } from './roblox-rules.js';
 import type { LeadPolicy, PlayPolicy } from './learned-policy.js';
 import type { RoundPosition } from './counterfactual.js';
 
@@ -106,6 +111,10 @@ export function playTrainingMatch(options: {
   opponentBurial?: NonNullable<
     Parameters<typeof playTrainingMatch>[0]['candidateBurial']
   >;
+  /** Overrides every seat's Chao Di choice (tests); the Roblox heuristic otherwise. */
+  chaodiDecision?: Parameters<typeof playRobloxChaodi>[1];
+  /** Told about every Chao Di call (Roblox rules only). */
+  onChaodi?: (call: ChaodiCall) => void;
   onRound?: (
     settlement: RoundSettlement,
     context: { levels: MatchState['levels']; attackingTeam: Team },
@@ -196,6 +205,26 @@ export function playTrainingMatch(options: {
     const exchanged = exchangeKitty(state, buried);
     if (!exchanged.ok) throw new Error(exchanged.message);
     state = exchanged.state;
+    // Roblox: after burial anyone may Chao Di (overturn trump, take and
+    // re-bury the kitty) before the dealer leads.
+    if (options.robloxRules)
+      state = playRobloxChaodi(
+        state,
+        options.chaodiDecision ??
+          ((_, calls, hand, trump, sameTeam) =>
+            chooseRobloxChaodi(calls, hand, trump, sameTeam)),
+        (seat, cards, size, trump) =>
+          (
+            (teamAt(seat) === options.candidateTeam
+              ? (options.candidatePolicy?.bury ?? options.candidateBurial)
+              : (options.opponentPolicy?.bury ?? options.opponentBurial)) ??
+            chooseBotBurial
+          )(cards, size, trump),
+        (call) => {
+          for (const id of call.cardIds) exposed.set(id, call.seat);
+          options.onChaodi?.(call);
+        },
+      );
     let trick = state.trick!;
     let captured = 0;
     let penalties = 0;

@@ -311,6 +311,11 @@ function main(): void {
           `champion ${report.confirmation.champion ? `${report.confirmation.champion.wins}/${report.confirmation.champion.games}` : 'n/a'}` +
           (report.confirmation.sharp
             ? `, live Sharp ${report.confirmation.sharp.wins}/${report.confirmation.sharp.games}`
+            : '') +
+          (report.confirmation.roblox
+            ? `, Roblox bots ${report.confirmation.roblox.wins}/${report.confirmation.roblox.games}` +
+              ` (levels ${report.confirmation.roblox.levelMarginMean?.toFixed(2) ?? 'n/a'}` +
+              ` [${report.confirmation.roblox.levelMarginLow?.toFixed(2) ?? 'n/a'}, ${report.confirmation.roblox.levelMarginHigh?.toFixed(2) ?? 'n/a'}])`
             : ''),
       );
   }
