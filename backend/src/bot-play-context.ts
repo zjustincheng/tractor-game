@@ -5,6 +5,7 @@ import type { BotPlayContext, TrickState } from '@tractor/rules';
 export function botPlayContext(
   trick: TrickState,
   dealerSeat?: number,
+  knownVoids?: readonly { seat: number; category: string }[],
 ): BotPlayContext {
   const seat = trick.nextSeat!;
   const played = new Set(trick.plays.map((play) => play.seat));
@@ -22,6 +23,11 @@ export function botPlayContext(
       (index) =>
         index !== seat && !played.has(index) && teamAt(index) !== teamAt(seat),
     ).length,
+    seatsToPlay: Array.from(
+      { length: trick.playerCount },
+      (_, index) => index,
+    ).filter((index) => index !== seat && !played.has(index)),
+    ...(knownVoids ? { knownVoids: [...knownVoids] } : {}),
     ...(dealerSeat === undefined ? {} : { dealerSeat }),
     ...(trick.largestPatternWins ? { largestPatternWins: true } : {}),
   };

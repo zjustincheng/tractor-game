@@ -12,8 +12,13 @@ const checkpoint = JSON.parse(readFileSync(path, 'utf8'));
 const { leadChampion: lead, followChampion: follow } = checkpoint;
 if (!lead || !follow) throw new Error('This checkpoint has no champion.');
 for (const model of [lead, follow])
-  if (model.input.length !== 16 || ![30, 33].includes(model.input[0].length))
-    throw new Error('Only 30- or 33-input champions are supported in Roblox.');
+  if (
+    model.input.length !== 16 ||
+    ![30, 33, 37].includes(model.input[0].length)
+  )
+    throw new Error(
+      'Only 30-, 33- or 37-input champions are supported in Roblox.',
+    );
 
 const list = (values) => `{ ${values.join(', ')} }`;
 const model = ({ input, bias, output, priorScale }) =>

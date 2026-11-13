@@ -25,7 +25,12 @@ import type {
 } from '@tractor/rules';
 import {
   CONTESTED_TRICK_POINTS,
+  feedGuard,
   followGuard,
+  followKillers,
+  killLeadGuard,
+  leadKillers,
+  usesKillInputs,
   isHighTrumpSingle,
   isSidePairWithoutAce,
   isSideAce,
@@ -40,7 +45,7 @@ export type LeadPolicy = (
   context: BotLeadContext,
 ) => string[];
 export const POLICY_VERSION = 'contextual-leads-v12-play-style';
-export const INPUTS = 33;
+export const INPUTS = 37;
 /** Models with fewer inputs are earlier champions; they keep their old play. */
 const STYLE_INPUTS = 33;
 export const HIDDEN = 16;
@@ -127,7 +132,7 @@ export function parsePolicy(value: unknown): PolicyModel {
     !model ||
     !Array.isArray(model.input) ||
     model.input.length !== HIDDEN ||
-    ![22, 30, INPUTS].some((size) =>
+    ![22, 30, 33, INPUTS].some((size) =>
       model.input.every((row) => vector(row, size)),
     ) ||
     !vector(model.bias, HIDDEN) ||
@@ -269,6 +274,12 @@ export function leadOptions(
           ),
       ),
       Number(isSmallProbe(component.cards, trump)),
+      ...killFeatures(
+        context.seat === undefined
+          ? { opponent: false, partner: false }
+          : leadKillers(context.knownVoids, context.seat, component.category),
+        component.cards.reduce((n, card) => n + cardPoints(card), 0),
+      ),
     ];
     return {
       cardIds: [...ids],
@@ -279,6 +290,20 @@ export function leadOptions(
           : 0,
     };
   });
+}
+
+/** Inputs 33-36: an opponent or only a partner can trump this suit, and the
+ * points that would be handed to them. */
+function killFeatures(
+  killers: { opponent: boolean; partner: boolean },
+  points: number,
+): number[] {
+  return [
+    Number(killers.opponent),
+    (Number(killers.opponent) * points) / 30,
+    Number(killers.partner),
+    (Number(killers.partner) * points) / 30,
+  ];
 }
 
 function hidden(model: PolicyModel, features: number[]): number[] {
@@ -375,13 +400,18 @@ export function choosePolicyLead(
         )
       : -1;
   if (styleGuard >= 0) chosen = styleGuard;
+  const killGuard = usesKillInputs(model)
+    ? killLeadGuard(hand, trump, chosen, options, context, probabilities)
+    : -1;
+  if (killGuard >= 0) chosen = killGuard;
+  const guard = killGuard >= 0 ? killGuard : styleGuard;
   const teacherIndex = options.findIndex((option) => option.prior > 0);
   record?.({
     options,
     chosen,
     temperature,
-    ...(styleGuard >= 0
-      ? { teacherIndex: styleGuard, teacherWeight: STYLE_TEACHER_WEIGHT }
+    ...(guard >= 0
+      ? { teacherIndex: guard, teacherWeight: STYLE_TEACHER_WEIGHT }
       : context.beliefSearch && teacherIndex >= 0
         ? { teacherIndex }
         : {}),
@@ -542,6 +572,19 @@ export function playOptions(
       ),
     );
   }
+  const killers =
+    ledCategory === 'trump'
+      ? { opponent: false, partner: false }
+      : followKillers(context, ledCategory);
+  for (const option of result)
+    option.features.push(
+      ...killFeatures(
+        killers,
+        hand
+          .filter((card) => option.cardIds.includes(card.id))
+          .reduce((sum, card) => sum + cardPoints(card), 0),
+      ),
+    );
   return result;
 }
 
@@ -599,7 +642,12 @@ export function choosePolicyPlay(
         )
       : -1;
   if (styleGuard >= 0) chosen = styleGuard;
-  const teacher = styleGuard >= 0 ? styleGuard : aceProtection;
+  const killGuard = usesKillInputs(model)
+    ? feedGuard(hand, lead, trump, context, chosen, options, probabilities)
+    : -1;
+  if (killGuard >= 0) chosen = killGuard;
+  const guard = killGuard >= 0 ? killGuard : styleGuard;
+  const teacher = guard >= 0 ? guard : aceProtection;
   record?.({
     options,
     chosen,
@@ -607,7 +655,7 @@ export function choosePolicyPlay(
     ...(teacher >= 0
       ? {
           teacherIndex: teacher,
-          teacherWeight: styleGuard >= 0 ? STYLE_TEACHER_WEIGHT : 0.05,
+          teacherWeight: guard >= 0 ? STYLE_TEACHER_WEIGHT : 0.05,
         }
       : {}),
   });

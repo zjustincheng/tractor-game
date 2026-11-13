@@ -28,6 +28,10 @@ export interface BotPlayContext {
   dealerSeat?: number;
   /** Roblox (D16): throws are won or lost on their largest piece. */
   largestPatternWins?: boolean;
+  /** Public: seats that showed out of a category in earlier tricks. */
+  knownVoids?: readonly { seat: number; category: string }[];
+  /** Public: seats still to play in this trick, excluding this seat. */
+  seatsToPlay?: readonly number[];
 }
 
 export interface BotLeadContext {
@@ -541,6 +545,7 @@ function tacticalFollow(
   } else {
     const winning = matchComponents(pool, lead, trump, {
       mustBeat: context.winning,
+      ...(context.largestPatternWins ? { largestPatternWins: true } : {}),
     });
     if (winning) candidates.push(winning.flatMap((item) => [...item.cards]));
   }

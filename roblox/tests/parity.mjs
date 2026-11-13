@@ -442,6 +442,9 @@ const seatContext = (context) => ({
   ...(context.winnerSeat === undefined
     ? {}
     : { winnerSeat: context.winnerSeat + 1 }),
+  ...(context.seatsToPlay
+    ? { seatsToPlay: context.seatsToPlay.map((s) => s + 1) }
+    : {}),
   ...(context.knownVoids
     ? {
         knownVoids: context.knownVoids.map((v) => ({
@@ -643,7 +646,7 @@ for (const playerCount of [4, 6, 8, 10])
               champion && choosePolicyLead(champion.lead, hand, t, context),
           });
       } else {
-        const context = botPlayContext(state, dealerSeat);
+        const context = botPlayContext(state, dealerSeat, [...voids.values()]);
         const lead = state.plays[0].components;
         ids = choosePolicyPlay(models.follow, hand, lead, t, context);
         if (turn % 4 === 1 || playerCount === 4)

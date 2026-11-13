@@ -197,6 +197,89 @@ return function(Cards, S, Rules, Model)
     return -1
   end
 
+  -- Kill rules: a seat that showed out of a side suit, but not of trump, can
+  -- trump ("kill") it. Port of play-style.ts; only models trained with the
+  -- kill inputs (any non-zero weight past input 33) use them.
+  local function usesKill(model)
+    for _, row in ipairs(model.input) do
+      for index = STYLE_INPUTS + 1, #row do
+        if row[index] ~= 0 then return true end
+      end
+    end
+    return false
+  end
+  local function canKill(known, seat, suit)
+    if suit == 'trump' then return false end
+    local out, outOfTrump = false, false
+    for _, entry in ipairs(known or {}) do
+      if entry.seat == seat and entry.category == suit then out = true end
+      if entry.seat == seat and entry.category == 'trump' then outOfTrump = true end
+    end
+    return out and not outOfTrump
+  end
+  local function killersAmong(known, seats, seat, suit)
+    local opponent, partner = false, false
+    for _, other in ipairs(seats) do
+      if other ~= seat and canKill(known, other, suit) then
+        if Cards.team(other) == Cards.team(seat) then partner = true else opponent = true end
+      end
+    end
+    return { opponent = opponent, partner = partner and not opponent }
+  end
+  local function leadKillers(known, seat, suit)
+    local seats = {}
+    for _, entry in ipairs(known or {}) do table.insert(seats, entry.seat) end
+    return killersAmong(known, seats, seat, suit)
+  end
+  local function followKillers(context, suit)
+    return killersAmong(context.knownVoids, context.seatsToPlay or {}, context.seat, suit)
+  end
+  local function killFeatures(features, killers, points)
+    table.insert(features, number(killers.opponent))
+    table.insert(features, number(killers.opponent) * points / 30)
+    table.insert(features, number(killers.partner))
+    table.insert(features, number(killers.partner) * points / 30)
+  end
+  local function killLeadGuard(hand, trump, chosen, options, context, scores)
+    if context.seat == nil then return -1 end
+    local function feeds(ids)
+      local cards = selectIds(hand, ids)
+      if not leadKillers(context.knownVoids, context.seat, Cards.category(cards[1], trump)).opponent then return false end
+      for _, card in ipairs(cards) do
+        if Cards.points(card) > 0 or (not card.joker and card.rank == 'A') then return true end
+      end
+      return false
+    end
+    if not feeds(options[chosen].cardIds) then return -1 end
+    local safe = {}
+    for index, option in ipairs(options) do
+      if not feeds(option.cardIds) then table.insert(safe, index) end
+    end
+    return preferred(safe, scores)
+  end
+  local function feedGuard(hand, lead, trump, context, chosen, options, scores)
+    local suit = lead[1].category
+    if suit == 'trump' or not followKillers(context, suit).partner then return -1 end
+    for _, component in ipairs(context.winning) do
+      if component.category == 'trump' then return -1 end
+    end
+    local safe, most, pointsAt = {}, 0, {}
+    for index, option in ipairs(options) do
+      local cards = selectIds(hand, option.cardIds)
+      if count(cards, function(card) return isTrump(card, trump) end) == 0 then
+        pointsAt[index] = pointsOf(cards)
+        most = math.max(most, pointsAt[index])
+        table.insert(safe, index)
+      end
+    end
+    if most == 0 or pointsAt[chosen] == most then return -1 end
+    local richest = {}
+    for _, index in ipairs(safe) do
+      if pointsAt[index] == most then table.insert(richest, index) end
+    end
+    return preferred(richest, scores)
+  end
+
   -- chooseBotLead helpers ----------------------------------------------------
   local function preserveFriendlyTrump(context)
     if not context.seat or not context.playerCount then return false end
@@ -464,6 +547,7 @@ return function(Cards, S, Rules, Model)
           number(isSmallProbe(component.cards, trump)),
         },
       })
+      killFeatures(options[#options].features, leadKillers(known, context.seat, component.category), pointsOf(component.cards))
     end
     return options
   end
@@ -556,6 +640,10 @@ return function(Cards, S, Rules, Model)
       features[31] = number(s.big and hasPlain and (partnerWinning or not s.wins or cheaperWinner or context.trickPoints < CONTESTED_POINTS))
       features[32] = s.wins and (highest - topOpponent) / 15 or 0
       features[33] = number(s.wins and not s.joker and s.power == strongestPlain)
+    end
+    local killers = ledCategory == 'trump' and { opponent = false, partner = false } or followKillers(context, ledCategory)
+    for _, option in ipairs(options) do
+      killFeatures(option.features, killers, pointsOf(selectIds(hand, option.cardIds)))
     end
     return options
   end
@@ -720,6 +808,10 @@ return function(Cards, S, Rules, Model)
       local guard = leadGuard(hand, trump, chosen, options, context, scores)
       if guard >= 0 then chosen = guard end
     end
+    if usesKill(model) then
+      local guard = killLeadGuard(hand, trump, chosen, options, context, scores)
+      if guard >= 0 then chosen = guard end
+    end
     return options[chosen].cardIds
   end
 
@@ -735,6 +827,10 @@ return function(Cards, S, Rules, Model)
     end
     if usesStyle(model) then
       local guard = followGuard(context, chosen, summarizeFollows(hand, lead, trump, context, options), scores)
+      if guard >= 0 then chosen = guard end
+    end
+    if usesKill(model) then
+      local guard = feedGuard(hand, lead, trump, context, chosen, options, scores)
       if guard >= 0 then chosen = guard end
     end
     return options[chosen].cardIds
@@ -814,10 +910,13 @@ return function(Cards, S, Rules, Model)
 
   function Trained.playContext(state, seat)
     local base = Rules.playContext(state, seat)
-    local played, opponents = {}, 0
+    local played, opponents, toPlay = {}, 0, {}
     for _, play in ipairs(state.trick) do played[play.seat] = true end
     for other = 1, state.playerCount do
-      if other ~= seat and not played[other] and Cards.team(other) ~= Cards.team(seat) then opponents = opponents + 1 end
+      if other ~= seat and not played[other] then
+        table.insert(toPlay, other)
+        if Cards.team(other) ~= Cards.team(seat) then opponents = opponents + 1 end
+      end
     end
     return {
       seat = seat,
@@ -827,6 +926,8 @@ return function(Cards, S, Rules, Model)
       trickPoints = base.trickPoints,
       opponentsRemaining = opponents,
       dealerSeat = state.kittyHolder or state.dealer,
+      seatsToPlay = toPlay,
+      knownVoids = Trained.leadContext(state, seat).knownVoids,
     }
   end
 

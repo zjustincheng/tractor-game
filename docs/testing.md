@@ -183,6 +183,8 @@ Roblox-rules training runs the game's Chao Di round after burial (`playRobloxCha
 
 `packages/rules/src/trick.test.ts` covers the Roblox-only largest-piece comparison for throws (D16), and `roblox/tests/parity.mjs` checks trick winners, follow features and complete rounds against the game with it on. Learned Chao Di decisions (`choosePolicyChaodi`) are checked against `Trained.chooseChaodi` on random models; the game uses them only for models exported with `robloxChaodi`.
 
+Kill rules (inputs 34–37 and the guards in `backend/src/training/play-style.ts`): a seat that has shown out of a side suit but not of trump can trump it. `play-style.test.ts` covers who can kill, leading points or a side ace into an opponent who can kill, feeding points when only a partner still to play can kill, and that the guards stay off for models trained before these inputs (all-zero weights past input 33). `roblox/tests/parity.mjs` checks the inputs and guarded choices against `TrainedBots.luau` on random models; `seatsToPlay` and `knownVoids` in `Trained.playContext` are covered only through `roblox/tests/trained.lua` play, not compared field by field. Throw follows in Roblox-rules training now search winning matches under D16 like the game.
+
 # Roblox foundation
 
 `roblox/tests/practice.lua` exercises the native pure Lua-compatible card and

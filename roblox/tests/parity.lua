@@ -69,7 +69,7 @@ local function sameOptions(actual,expected,path)
   for i,want in ipairs(expected) do
     equal(actual[i].cardIds,want.ids,path..' option '..i)
     assert(math.abs(actual[i].prior-want.prior)<1e-9,path..' prior '..i)
-    for j=1,33 do
+    for j=1,37 do
       local have,goal=actual[i].features[j] or 0,want.features[j] or 0
       assert(math.abs(have-goal)<1e-9,path..' option '..i..' feature '..(j-1)..': '..have..' ~= '..goal)
     end

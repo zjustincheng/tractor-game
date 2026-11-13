@@ -284,7 +284,7 @@ export function playTrainingMatch(options: {
               hand,
               trick.plays[0]!.components!,
               trick.trump,
-              botPlayContext(trick, state.dealerSeat),
+              botPlayContext(trick, state.dealerSeat, knownVoids),
             );
       options.onPosition?.({
         trick,

@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { decomposeLead } from '@tractor/rules';
 import type { BotLeadContext, BotPlayContext, Card } from '@tractor/rules';
 import {
+  canKill,
+  feedGuard,
   followFlaw,
   followGuard,
+  killLeadGuard,
+  usesKillInputs,
   leadFlaw,
   leadGuard,
   summarizeFollows,
@@ -182,5 +186,84 @@ describe('follow style', () => {
     expect(followFlaw(context, all[joker]!, all)).toBe('joker-waste');
     const replaced = followGuard(context, joker, all, zeros(all.length));
     expect(options[replaced]!.cardIds).toEqual([voidHand[1]!.id]);
+  });
+});
+
+describe('kill rules', () => {
+  const opponentOut = [{ seat: 1, category: 'hearts' }];
+  const ten = suited('10', 'hearts');
+  const hand = [ten, suited('3', 'hearts'), suited('4', 'clubs')];
+
+  it('lets only a seat with trump left kill a side suit', () => {
+    expect(canKill(opponentOut, 1, 'hearts')).toBe(true);
+    expect(
+      canKill([...opponentOut, { seat: 1, category: 'trump' }], 1, 'hearts'),
+    ).toBe(false);
+    expect(canKill(opponentOut, 1, 'trump')).toBe(false);
+  });
+
+  it('does not lead points into a suit an opponent can trump', () => {
+    const lead = { ...context, knownVoids: opponentOut };
+    const options = leadOptions(hand, trump, lead);
+    const chosen = options.findIndex((o) => o.cardIds[0] === ten.id);
+    const replaced = killLeadGuard(
+      hand,
+      trump,
+      chosen,
+      options,
+      lead,
+      zeros(options.length),
+    );
+    expect(options[replaced]!.cardIds).not.toContain(ten.id);
+    const low = options.findIndex((o) => o.cardIds[0] === '0:hearts:3');
+    expect(
+      killLeadGuard(hand, trump, low, options, lead, zeros(options.length)),
+    ).toBe(-1);
+    expect(options[chosen]!.features.slice(33)).toEqual([1, 10 / 30, 0, 0]);
+  });
+
+  it('feeds points when only a partner still to play can trump', () => {
+    const lead = decomposeLead([suited('A', 'hearts', 1)], trump)!;
+    const follow: BotPlayContext = {
+      seat: 2,
+      winnerSeat: 1,
+      winning: lead,
+      lastToPlay: false,
+      trickPoints: 0,
+      opponentsRemaining: 0,
+      seatsToPlay: [0],
+      knownVoids: [{ seat: 0, category: 'hearts' }],
+    };
+    const options = playOptions(hand, lead, trump, follow);
+    const low = options.findIndex((o) => o.cardIds[0] === '0:hearts:3');
+    const fed = feedGuard(
+      hand,
+      lead,
+      trump,
+      follow,
+      low,
+      options,
+      zeros(options.length),
+    );
+    expect(options[fed]!.cardIds).toEqual([ten.id]);
+    expect(options[fed]!.features.slice(33)).toEqual([0, 0, 1, 10 / 30]);
+    // An opponent after us who can also trump: no feeding.
+    const risky = {
+      ...follow,
+      seatsToPlay: [0, 3],
+      knownVoids: [...follow.knownVoids!, { seat: 3, category: 'hearts' }],
+    };
+    expect(
+      feedGuard(hand, lead, trump, risky, low, options, zeros(options.length)),
+    ).toBe(-1);
+  });
+
+  it('switches on only for models trained with the kill inputs', () => {
+    const old = parsePolicy({
+      ...newPolicy(seededRandom(3)),
+      input: newPolicy(seededRandom(3)).input.map((row) => row.slice(0, 33)),
+    });
+    expect(usesKillInputs(old)).toBe(false);
+    expect(usesKillInputs(newPolicy(seededRandom(3)))).toBe(true);
   });
 });
