@@ -1,31 +1,25 @@
-import { learnedBotPolicy } from './bot-policy.js';
-import { DEFAULT_BOT_LEAD_WEIGHTS, RANKS, RULES_VERSION } from '@tractor/rules';
+import { RANKS, RULES_VERSION } from '@tractor/rules';
 import type { Team } from '@tractor/rules';
 import {
-  choosePolicyLead,
-  choosePolicyDeclaration,
-  choosePolicyBurial,
-  choosePolicyChaodi,
-  choosePolicyPlay,
   newPolicy,
   parsePolicy,
   POLICY_VERSION,
-  learnedLogitSpread,
   policyProbabilities,
 } from './learned-policy.js';
 import type { PolicyModel, PolicyExperience } from './learned-policy.js';
 import { parseConfig, generationSeeds, summarize } from './optimizer.js';
 import type { TrainingConfig, Evaluation } from './optimizer.js';
-import { playTrainingMatch, seededRandom } from './self-play.js';
+import { seededRandom } from './self-play.js';
 import type { SelfPlayResult } from './self-play.js';
+import type { EvaluationMatch, PracticeMatch } from './evaluation-match.js';
 import { updateFromOutcomes, newOptimizer } from './policy-update.js';
 import type { PolicyOptimizer } from './policy-update.js';
-import { roundReward } from './policy-reward.js';
+import {
+  playEvaluationMatches,
+  playPracticeMatches,
+} from './evaluation-pool.js';
 export { roundReward } from './policy-reward.js';
-import { heuristicPolicy } from '../bot-policy.js';
-import { robloxBotPolicy } from './roblox-bot.js';
-import { compareAlternatives } from './counterfactual.js';
-import type { RoundPosition, ComparisonCounts } from './counterfactual.js';
+import type { ComparisonCounts } from './counterfactual.js';
 
 export interface PolicyReport {
   pointMarginVersion?: 2;
@@ -773,30 +767,8 @@ export function trainPolicyGeneration(
   // learner is far ahead of it, the remaining practice is more useful against
   // champion/archive opponents.
   const opponents = [champion, ...archive].filter((p): p is Pair => p !== null);
-  function opponentPolicies(pair: Pair | 'sharp' | 'roblox' | null) {
-    if (!pair) return {};
-    if (pair === 'roblox') return { opponentPolicy: robloxBotPolicy };
-    // Sharp plays with its own validated-throw information, exactly as a player
-    // meets it in the app. Practice never faces it, which is the point.
-    if (pair === 'sharp') return { opponentPolicy: heuristicPolicy('sharp') };
-    const policy = learnedBotPolicy(
-      pair.lead,
-      pair.follow,
-      {},
-      { robloxRules: checkpoint.robloxRules === true },
-    );
-    return {
-      opponentLead: ((hand, trump, context) =>
-        policy.lead(hand, trump, context, [])) as NonNullable<
-        Parameters<typeof playTrainingMatch>[0]['opponentLead']
-      >,
-      opponentPlay: policy.follow,
-      opponentDeclaration: policy.declare,
-      opponentBurial: policy.bury,
-    };
-  }
   const practiceStarted = performance.now();
-  const continuation = learnedBotPolicy(leadBase, followBase);
+  const practice: PracticeMatch[] = [];
   for (const playerCount of checkpoint.config.playerCounts) {
     for (const [index, seed] of generationSeeds(
       checkpoint.config,
@@ -816,155 +788,39 @@ export function trainPolicyGeneration(
             : (opponents[
                 (generation + Math.floor(index / 2)) % opponents.length
               ] ?? null);
-      for (const candidateTeam of ['A', 'B'] as const) {
-        let leadExperiences: PolicyExperience[] = [];
-        let followExperiences: PolicyExperience[] = [];
-        const rounds: typeof pending = [];
-        // Exploration uses a separate stream and cannot change the shuffled cards.
-        const pick = seededRandom(
-          (seed ^
-            Math.imul(playerCount, 7919) ^
-            (candidateTeam === 'A' ? 0x9e3779b9 : 0x85ebca6b)) >>>
-            0,
-        );
-        // Reservoir sampling covers the whole match with eight bounded positions.
-        // Its random stream cannot change deals or the acting policy's exploration.
-        const comparePick = seededRandom(
-          (seed ^
-            Math.imul(playerCount, 15485863) ^
-            (candidateTeam === 'A' ? 0x51ed270b : 0x41c64e6d)) >>>
-            0,
-        );
-        const positions: {
-          position: RoundPosition;
-          experience: PolicyExperience;
-        }[] = [];
-        let eligible = 0;
-        let lastExperience: PolicyExperience | undefined;
-        const result = playTrainingMatch({
+      for (const candidateTeam of ['A', 'B'] as const)
+        practice.push({
           seed,
           playerCount,
           candidateTeam,
-          candidate: DEFAULT_BOT_LEAD_WEIGHTS,
-          opponent: DEFAULT_BOT_LEAD_WEIGHTS,
           maxRounds: checkpoint.config.maxRounds,
           robloxRules: checkpoint.robloxRules === true,
-          candidateLead: (hand, trump, context) =>
-            choosePolicyLead(
-              leadBase,
-              hand,
-              trump,
-              context,
-              pick,
-              (experience) => {
-                leadExperiences.push(experience);
-                lastExperience = experience;
-              },
-            ),
-          candidatePlay: (hand, lead, trump, context) =>
-            choosePolicyPlay(
-              followBase,
-              hand,
-              lead,
-              trump,
-              context,
-              pick,
-              (experience) => {
-                followExperiences.push(experience);
-                lastExperience = experience;
-              },
-            ),
-          candidateDeclaration: (options, hand, level) =>
-            choosePolicyDeclaration(
-              followBase,
-              options,
-              hand,
-              level,
-              pick,
-              (experience) => followExperiences.push(experience),
-            ),
-          ...(checkpoint.robloxRules === true
-            ? {
-                candidateChaodi: (calls, hand, trump, sameTeam) =>
-                  choosePolicyChaodi(
-                    followBase,
-                    calls,
-                    hand,
-                    trump,
-                    sameTeam,
-                    pick,
-                    (experience) => followExperiences.push(experience),
-                  ),
-              }
-            : {}),
-          candidateBurial: (cards, size, trump) =>
-            choosePolicyBurial(
-              followBase,
-              cards,
-              size,
-              trump,
-              pick,
-              (experience) => followExperiences.push(experience),
-              checkpoint.robloxRules === true,
-            ),
-          ...opponentPolicies(opponent),
-          onPosition: (position) => {
-            const seat = position.trick.nextSeat!;
-            if (seat % 2 !== (candidateTeam === 'A' ? 0 : 1)) return;
-            const experience = lastExperience;
-            lastExperience = undefined;
-            if (!experience || experience.options.length < 2) return;
-            const index = comparePick(++eligible);
-            if (positions.length < 8) positions.push({ position, experience });
-            else if (index < 8) positions[index] = { position, experience };
-          },
-          onRound: (settlement, { levels, attackingTeam }) => {
-            rounds.push({
-              leadExperiences,
-              followExperiences,
-              reward: roundReward(
-                levels,
-                settlement,
-                candidateTeam,
-                playerCount,
-                attackingTeam,
-              ),
-            });
-            leadExperiences = [];
-            followExperiences = [];
-          },
+          counterfactualWeight: checkpoint.config.counterfactualWeight,
+          lead: leadBase,
+          follow: followBase,
+          opponent,
         });
-        for (const { position, experience } of checkpoint.config
-          .counterfactualWeight === 0
-          ? []
-          : positions) {
-          const counts = compareAlternatives(
-            position,
-            experience,
-            comparePick,
-            4,
-            continuation,
-          );
-          for (const key of [
-            'positions',
-            'rollouts',
-            'informativePairs',
-            'betterThanBaseline',
-          ] as const)
-            comparisons[key] += counts[key];
-        }
-        // Completed rounds provide valid local feedback even if a match hits its cap.
-        const returns = discountedReturns(rounds.map((r) => r.reward));
-        rounds.forEach((r, i) => pending.push({ ...r, reward: returns[i]! }));
-        completed += rounds.length;
-        decisions += rounds.reduce(
-          (n, r) => n + r.leadExperiences.length + r.followExperiences.length,
-          0,
-        );
-        results.push(result);
-        onGame?.('practice', result);
-      }
     }
+  }
+  for (const outcome of playPracticeMatches(practice)) {
+    for (const key of [
+      'positions',
+      'rollouts',
+      'informativePairs',
+      'betterThanBaseline',
+    ] as const)
+      comparisons[key] += outcome.comparisons[key];
+    const { rounds, result } = outcome;
+    // Completed rounds provide valid local feedback even if a match hits its cap.
+    const returns = discountedReturns(rounds.map((r) => r.reward));
+    rounds.forEach((r, i) => pending.push({ ...r, reward: returns[i]! }));
+    completed += rounds.length;
+    decisions += rounds.reduce(
+      (n, r) => n + r.leadExperiences.length + r.followExperiences.length,
+      0,
+    );
+    results.push(result);
+    onGame?.('practice', result);
   }
   onPhase?.('practice', performance.now() - practiceStarted, results.length);
   const updateStarted = performance.now();
@@ -1062,28 +918,7 @@ export function trainPolicyGeneration(
     confirmation = false,
   ): Evaluation {
     const started = performance.now();
-    const logitSpreads: number[] = [];
-    const record = (model: PolicyModel) => (e: PolicyExperience) => {
-      if (phase !== behaviorPhase || e.options.length < 2) return;
-      logitSpreads.push(learnedLogitSpread(model, e.options));
-      const baseline = e.options.findIndex((o) => o.prior > 0);
-      if (baseline < 0) return;
-      evaluationBehavior.choices++;
-      if (e.chosen !== baseline) evaluationBehavior.differentFromBaseline++;
-    };
-    const evaluatedPolicy = learnedBotPolicy(
-      leadLearner,
-      followLearner,
-      {
-        lead: record(leadLearner),
-        follow: record(followLearner),
-      },
-      {
-        robloxRules: checkpoint.robloxRules === true,
-        robloxChaodi: checkpoint.robloxRules === true,
-      },
-    );
-    const matches: SelfPlayResult[] = [];
+    const specs: EvaluationMatch[] = [];
     for (const playerCount of checkpoint.config.playerCounts) {
       // The Roblox re-test runs on twice as many fresh deals: a candidate is
       // only re-tested after a lucky first score, so a real but small edge
@@ -1110,29 +945,27 @@ export function trainPolicyGeneration(
         seedCount,
       )) {
         const seed = confirmation ? (baseSeed + 1000000000) >>> 0 : baseSeed;
-        for (const candidateTeam of ['A', 'B'] as const) {
-          const result = playTrainingMatch({
+        for (const candidateTeam of ['A', 'B'] as const)
+          specs.push({
             seed,
             playerCount,
             candidateTeam,
-            candidate: DEFAULT_BOT_LEAD_WEIGHTS,
-            opponent: DEFAULT_BOT_LEAD_WEIGHTS,
             maxRounds: checkpoint.config.maxRounds,
             robloxRules: checkpoint.robloxRules === true,
-            candidateLead: (hand, trump, context) =>
-              evaluatedPolicy.lead(hand, trump, context, []),
-            candidatePlay: evaluatedPolicy.follow,
-            candidateDeclaration: evaluatedPolicy.declare,
-            candidateBurial: evaluatedPolicy.bury,
-            ...(evaluatedPolicy.chaodi
-              ? { candidateChaodi: evaluatedPolicy.chaodi }
-              : {}),
-            ...opponentPolicies(opponent),
+            lead: leadLearner,
+            follow: followLearner,
+            opponent,
+            recordBehavior: phase === behaviorPhase,
           });
-          matches.push(result);
-          onGame?.(phase, result);
-        }
       }
+    }
+    const outcomes = playEvaluationMatches(specs);
+    const matches = outcomes.map((outcome) => outcome.result);
+    const logitSpreads = outcomes.flatMap((outcome) => outcome.logitSpreads);
+    for (const outcome of outcomes) {
+      evaluationBehavior.choices += outcome.choices;
+      evaluationBehavior.differentFromBaseline += outcome.differentFromBaseline;
+      onGame?.(phase, outcome.result);
     }
     const evaluation = summarizePaired(
       matches,

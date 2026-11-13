@@ -185,6 +185,8 @@ Roblox-rules training runs the game's Chao Di round after burial (`playRobloxCha
 
 Kill rules (inputs 34–37 and the guards in `backend/src/training/play-style.ts`): a seat that has shown out of a side suit but not of trump can trump it. `play-style.test.ts` covers who can kill, leading points or a side ace into an opponent who can kill, feeding points when only a partner still to play can kill, and that the guards stay off for models trained before these inputs (all-zero weights past input 33). `roblox/tests/parity.mjs` checks the inputs and guarded choices against `TrainedBots.luau` on random models; `seatsToPlay` and `knownVoids` in `Trained.playContext` are covered only through `roblox/tests/trained.lua` play, not compared field by field. Throw follows in Roblox-rules training now search winning matches under D16 like the game.
 
+Policy training plays practice and evaluation games on worker threads (`backend/src/training/evaluation-pool.ts`); `TRAINING_WORKERS` sets the count, and the CLI defaults to one fewer than the CPU count. Each game is seeded independently, so a generation's checkpoint is identical serially and in parallel; this was checked by hashing one reduced-size generation both ways. Unit tests use the serial path, since workers need tsx to load TypeScript.
+
 # Roblox foundation
 
 `roblox/tests/practice.lua` exercises the native pure Lua-compatible card and

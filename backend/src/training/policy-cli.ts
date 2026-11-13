@@ -7,6 +7,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
+import { availableParallelism } from 'node:os';
 import { parseConfig } from './optimizer.js';
 import {
   assertEvaluationSize,
@@ -17,6 +18,10 @@ import {
 } from './policy-training.js';
 
 function main(): void {
+  // Evaluation games run on worker threads; TRAINING_WORKERS=1 plays serially.
+  process.env.TRAINING_WORKERS ??= String(
+    Math.max(1, availableParallelism() - 1),
+  );
   const args = process.argv.slice(2);
   if (args.includes('--help')) {
     console.log(
