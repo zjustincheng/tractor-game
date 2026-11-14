@@ -75,6 +75,9 @@ local bot = new()
 assert(Practice.declare(bot, 2, 1, 101))
 assert(Practice.advance(bot, 109, function() return 1 end))
 assert(bot.phase == 'chaodi' and bot.dealer == 2)
+-- The Chao Di clock starts when the bot buries, not at time zero, so the next
+-- seat (often the human) gets its full turn instead of an instant pass.
+assert(bot.chaodiDeadline == 109 + Practice.CHAODI_SECONDS, 'Bot burial starts the Chao Di clock now')
 finishChaodi(bot)
 assert(bot.phase == 'tricks' and bot.dealer == 2 and bot.turn == 1)
 assert(#bot.kitty == 8 and #Practice.view(bot).hand == 25)

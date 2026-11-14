@@ -410,7 +410,7 @@ return function(Cards, S, Rules, Scoring, Trained)
       state.kitty={}
       table.insert(state.events,{kind='lock',at=now})
       if not isHuman(state,state.dealer) then
-        assert(Practice.bury(state, state.dealer, botBurialIds(state, state.dealer)))
+        assert(Practice.bury(state, state.dealer, botBurialIds(state, state.dealer), now))
         if not state.paced then Practice.bots(state) end
       end
     end

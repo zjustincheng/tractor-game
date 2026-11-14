@@ -670,3 +670,7 @@ with the website, but Chao Di is not simulated during training. Training covers
 ## Roblox Battle Pass
 
 `roblox/tests/pass.lua` covers the reward catalog, XP limits, timed card-marker boosts, claim rules, premium locks, saving, forged data, and season resets. Paying out a real premium purchase needs a live test once a Developer Product ID is set.
+
+## Roblox landscape phones and Chao Di timing
+
+`roblox/tests/layout.lua` checks the hand, action row and table at 760×310 and 740×300 (landscape phones after Roblox's top bar), and the side-column seat order (`TableLayout.sideSeats`) at 6, 8 and 10 players. `roblox/tests/setup.lua` checks that a bot dealer's burial starts the Chao Di clock at the burial time, so the next seat gets its full turn. Simulated previews were checked at 760×310 and 844×390 only; the layout has not been checked on a real phone. `roblox/tests/client.lua` still fails on checks written before the Studio shop and lobby redesign (missing emote buttons and hidden hero action), starting at line 266.

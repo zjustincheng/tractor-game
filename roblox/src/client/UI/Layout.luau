@@ -315,13 +315,48 @@ C.resize = function()
   rect(centerDeck, (aw - deckW) / 2, ah * 0.44 - deckH / 2, deckW, deckH + 20)
   rect(arenaUI.centerDeckBadge, -18, deckH + 4, deckW + 36, 18)
 
+  -- Landscape phones at 6+ player tables: seats become slim chips in a column
+  -- on each side, wrapping into a second column when one would reach the hand.
+  local chips = {}
+  l.sideSeats = nil
+  if l.short and current and current.playerCount > 4 then
+    local sides = C.Layout.sideSeats(current.playerCount)
+    local chipW, chipH, gap = 112, 28, 3
+    local room = math.max(chipH, l.handY + 20 - (arenaY - 4))
+    local perColumn = math.max(1, math.floor((room + gap) / (chipH + gap)))
+    sides.leftEdge, sides.rightEdge = 14, w - 14
+    for _, side in ipairs({ 'left', 'right' }) do
+      local column = sides[side]
+      local columns = math.max(1, math.ceil(#column / perColumn))
+      local rows = math.ceil(#column / columns)
+      for index, seat in ipairs(column) do
+        local c, r = math.floor((index - 1) / rows), (index - 1) % rows
+        local x = side == 'left' and (14 + c * (chipW + 4)) or (w - 14 - chipW - c * (chipW + 4))
+        chips[seat] = { x = x, y = arenaY - 4 + r * (chipH + gap), w = chipW, h = chipH, left = side == 'left' }
+      end
+      if #column > 0 then
+        local span = columns * (chipW + 4)
+        if side == 'left' then sides.leftEdge = 14 + span else sides.rightEdge = w - 14 - span end
+      end
+    end
+    l.sideSeats = sides
+    -- Last Trick moves just under the table, clear of both columns.
+    rect(arenaUI.peekButton, sides.leftEdge - arenaInset + 6, ah + 6, 104, 22)
+  end
   for seat = 2, 10 do
     local s = seats[seat]
-    local sw = l.compact and 90 or 120
+    local sw = l.compact and 90 or (l.short and 104 or 120)
     local avatarSize = l.short and 28 or (l.compact and 34 or 38)
-    local sh = avatarSize + 58
+    -- Landscape phones show only avatar and name, so the panels stay short.
+    local sh = avatarSize + (l.short and 26 or 58)
     local x = seat == 2 and w - sw - 14 or (seat == 4 and 14 or (w - sw) / 2)
     local y = seat % 2 == 1 and (arenaY - 18) or (arenaY + safeClamp(math.floor(ah * 0.48 - sh * 0.5) + 14, 76, ah - sh))
+    if l.short then
+      -- Your partner's panel sits above the left opponent's, so the middle of
+      -- the table is free for played cards.
+      -- The right side mirrors it: Last Trick on top, the opponent below.
+      y = arenaY + 40
+    end
     rect(s.holder, x, y, sw, sh)
     rect(s.avatar, (sw - avatarSize) / 2, 6, avatarSize, avatarSize)
     rect(s.name, 0, avatarSize + 8, sw, 15)
@@ -347,9 +382,11 @@ C.resize = function()
       -- Landscape phones: keep the partner panel and its declared-card chip
       -- below the header buttons instead of on top of them.
       if l.short then
-        -- Well left of centre, clear of every played card in the middle.
-        rect(s.holder, math.max(140, w / 2 - partnerWidth - 96), arenaY - 2, partnerWidth, 52)
-        rect(s.declarationCards, partnerWidth + 6, 15, 68, 22)
+        -- Top of the left edge, above the left opponent, clear of every played card.
+        rect(s.holder, 14, arenaY - 6, 104, 40)
+        rect(s.name, 40, 4, 58, 15)
+        rect(s.count, 40, 20, 58, 14)
+        rect(s.declarationCards, 110, 8, 68, 22)
       end
       s.count.Visible = current and current.botCoins and current.botCoins[seat] ~= nil or false
     end
@@ -357,9 +394,9 @@ C.resize = function()
     s.count.Visible = current and current.botCoins and current.botCoins[seat] ~= nil or false
     if current and current.playerCount > 4 then
       local angle = math.pi/2 - (seat-1)*2*math.pi/current.playerCount
-      local boxW = l.compact and 54 or 78
-      local av = l.compact and 26 or 34
-      local boxH = av + 34
+      local boxW = l.compact and 54 or (l.short and 64 or 78)
+      local av = l.compact and 26 or (l.short and 22 or 34)
+      local boxH = av + (l.short and 18 or 34)
       local radiusX = (aw - boxW) * 0.5
       local radiusY = math.max(0, (ah - boxH) * 0.5)
       -- On short tables an ellipse stacks the side seats; a racetrack
@@ -373,10 +410,23 @@ C.resize = function()
       rect(s.avatar,(boxW-av)/2,3,av,av)
       rect(s.name,0,av+2,boxW,14); s.name.TextSize=l.compact and 9 or 11
       rect(s.count,4,av+18,boxW-8,13); s.count.TextSize=l.compact and 8 or 9
-      s.count.Visible = current and current.botCoins and current.botCoins[seat] ~= nil or false
+      s.count.Visible = not l.short and current and current.botCoins and current.botCoins[seat] ~= nil or false
       s.details.Visible=false
       rect(s.declarationCards, (boxW - 64) / 2, -19, 64, 20)
       s.name.TextXAlignment=Enum.TextXAlignment.Center
+      local chip = chips[seat]
+      -- The card-count badge hangs off the panel's corner, or sits inside a chip.
+      s.handBadge.Position = chip and UDim2.new(1, -3, 0, 4) or UDim2.new(1, 6, 0, -8)
+      if chip then
+        rect(s.holder, chip.x, chip.y, chip.w, chip.h)
+        rect(s.avatar, 3, 3, chip.h - 6, chip.h - 6)
+        rect(s.name, chip.h + 2, 0, chip.w - chip.h - 42, chip.h)
+        s.name.TextSize = 10
+        s.name.TextXAlignment = Enum.TextXAlignment.Left
+        s.count.Visible = false
+        -- Declared cards show beside the chip, toward the table.
+        rect(s.declarationCards, chip.left and (chip.w + 4) or -68, 4, 64, 20)
+      end
     end
   end
 
@@ -729,11 +779,11 @@ C.resize = function()
     rect(queueUI.cancelBtn, qW - 116, qH - 52, 100, 38)
   end
 
-  rect(notice, 16, l.oneLine and (l.actionY + 19) or (l.actionY - 2), w - 32, 22)
+  rect(notice, 16, l.short and (l.actionY + 2) or (l.oneLine and (l.actionY + 19) or (l.actionY - 2)), w - 32, 22)
   notice.TextSize = l.compact and 11 or 14
-  rect(phaseRibbon, 16, l.oneLine and -200 or (l.actionY + 19), w - 32, 22)
-  rect(phaseLine, 20, l.oneLine and -200 or (l.actionY + 21), w - 40, 18)
-  rect(actionBar, 0, l.actionY + 43, w, 40)
+  rect(phaseRibbon, 16, l.oneLine and -200 or (l.actionY + (l.short and 2 or 19)), w - 32, 22)
+  rect(phaseLine, 20, l.oneLine and -200 or (l.actionY + (l.short and 4 or 21)), w - 40, 18)
+  rect(actionBar, 0, l.actionY + (l.short and 24 or 43), w, 40)
   rect(clear, startX, 0, clearW, 38)
   if current and current.phase == 'doubling' then
     arenaUI.doubleBtn.Position = UDim2.new(0.5, -70, 0, 0)
@@ -800,9 +850,9 @@ C.resize = function()
     if arenaUI.refreshDock then arenaUI.refreshDock() end
   end
   local declarationStripHeight = current and current.phase == 'declaration' and 76 or 40
-  rect(optionsFrame, 16, l.actionY + 43, w - 32, declarationStripHeight)
+  rect(optionsFrame, 16, l.actionY + (l.short and 24 or 43), w - 32, declarationStripHeight)
   if current and current.phase == 'chaodi' then
-    rect(actionBar, 0, l.actionY + 85, w, 40)
+    rect(actionBar, 0, l.actionY + (l.short and 66 or 85), w, 40)
   end
   local declarationHandOffset = current and (current.phase == 'declaration' or current.phase == 'chaodi') and (l.short and 22 or 44) or 0
   rect(handFrame, 16, l.handY + declarationHandOffset, w - 32, math.max(80, l.handHeight - declarationHandOffset))

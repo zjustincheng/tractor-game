@@ -7,9 +7,16 @@ local Structures = dofile('roblox/src/shared/Structures.luau')(Cards)
 local Rules = dofile('roblox/src/shared/PlayRules.luau')(Cards, Structures)
 local Scoring = dofile('roblox/src/shared/Scoring.luau')(Cards)
 local Practice = dofile('roblox/src/server/Practice.luau')(Cards, Structures, Rules, Scoring)
+-- The steps below assume the old 8-second declaration window, like the other suites.
+Practice.DECLARE_SECONDS = 8
 local width, height = tonumber(arg[2]) or 1440, tonumber(arg[3]) or 900
 local function signal()
-  return { Connect = function(self, fn) self.handler = fn end }
+  -- Like Roblox, every connected listener runs (several UI modules share the remote).
+  return { Connect = function(self, fn)
+    self.handlers = self.handlers or {}
+    table.insert(self.handlers, fn)
+    self.handler = function(...) for _, listener in ipairs(self.handlers) do listener(...) end end
+  end }
 end
 local methods = {}
 math.clamp = function(value, minimum, maximum) return math.max(minimum, math.min(maximum,value)) end
@@ -229,6 +236,8 @@ while state.phase == 'chaodi' do
     assert(Practice.stepChaodiBot(state, 0))
   end
 end
+-- The Double window follows Chao Di; close it so play can start.
+if state.phase == 'doubling' then assert(Practice.endDoubling(state, 0, true)) end
 receive(state)
 assert(state.phase == 'tricks' and state.turn == 1)
 local id = state.hands[1][1].id
@@ -303,6 +312,7 @@ local function trickInProgress(count, played)
   while game.phase == 'chaodi' do
     if game.chaodiTurn == 1 then assert(Practice.chaodiPass(game, 1, 0)) else assert(Practice.stepChaodiBot(game, 0)) end
   end
+  if game.phase == 'doubling' then assert(Practice.endDoubling(game, 0, true)) end
   local function playOne()
     local seat = game.turn
     local chosen = Rules.choose(game.hands[seat], game.trick[1] and game.trick[1].components, game.trump)

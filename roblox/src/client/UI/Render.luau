@@ -533,7 +533,8 @@ C.render = function()
   local portrait = aw < ah
   -- 4-player tables stack the partner's play above yours, so both plays and
   -- their tags must fit between the partner panel (~40px) and the trick label.
-  local cardHeight = C.currentLayout.short and 44 or (multiSeat and safeClamp(math.floor(math.min(ah * 0.13, aw * 0.1)), 36, 64) or safeClamp(math.floor(math.min(ah * 0.28, aw * 0.17, (ah - 132) / 2)), 36, 90))
+  -- Landscape phones: one row of plays, as tall as the table allows.
+  local cardHeight = C.currentLayout.short and safeClamp(math.floor(ah - 34), 40, 64) or (multiSeat and safeClamp(math.floor(math.min(ah * 0.13, aw * 0.1)), 36, 64) or safeClamp(math.floor(math.min(ah * 0.28, aw * 0.17, (ah - 132) / 2)), 36, 90))
   local cardWidth = math.floor(cardHeight * 0.66)
 
   -- Non-overlapping diamond trick layout with ample breathing room
@@ -544,7 +545,7 @@ C.render = function()
     {0.32, 0.48}, -- Seat 4: West (Opponent)
   }
   if C.currentLayout.short then
-    locations = { {0.42, 0.5}, {0.72, 0.5}, {0.58, 0.5}, {0.28, 0.5} }
+    locations = { {0.41, 0.5}, {0.77, 0.5}, {0.59, 0.5}, {0.23, 0.5} }
   elseif portrait then
     -- Narrow tables: stretch the diamond vertically so side plays clear the
     -- seat panels and the partner's play.
@@ -584,14 +585,30 @@ C.render = function()
       -- Tags sit on the outer side so neighbouring plays never collide, except
       -- straight up where the seat panel would cover them.
       tagBelow = math.sin(angle) > 0 or math.sin(angle) < -0.9
+      -- Landscape phones: one row between the side columns of seat chips.
+      local sides = C.currentLayout.short and C.currentLayout.sideSeats
+      if sides and sides.slot[play.seat] then
+        local left = sides.leftEdge - arena.Position.X.Offset + 6
+        local right = sides.rightEdge - arena.Position.X.Offset - 6
+        local slotW = (right - left) / current.playerCount
+        position = { (left + slotW * (sides.slot[play.seat] - 0.5)) / aw, 0.5 }
+        tagBelow = true
+      end
     end
     -- Fan played cards wide enough that each rank/suit corner stays readable.
     local fan = math.max(18, math.floor(cardWidth * 0.52))
-    local groupWidth = math.min(aw * (current.playerCount > 4 and 0.2 or 0.3), cardWidth+(#play.cards-1)*fan)
+    local maxGroup = aw * (current.playerCount > 4 and 0.2 or (C.currentLayout.short and 0.16 or 0.3))
+    local rowSlot
+    if multiSeat and C.currentLayout.short and C.currentLayout.sideSeats then
+      local sides = C.currentLayout.sideSeats
+      rowSlot = (sides.rightEdge - sides.leftEdge - 12) / current.playerCount
+      maxGroup = math.max(cardWidth, rowSlot - 10)
+    end
+    local groupWidth = math.min(maxGroup, cardWidth+(#play.cards-1)*fan)
     local step = #play.cards > 1 and math.max(5,(groupWidth-cardWidth)/(#play.cards-1)) or 0
     local groupX, groupY = aw * position[1] - groupWidth / 2, ah * position[2] - cardHeight / 2
-    -- In compact layouts the partner panel overlaps the arena's top 34px.
-    if C.currentLayout.short then groupY = math.max(groupY, 38) end
+    -- Landscape phones: centre each play and the name tag beneath it.
+    if C.currentLayout.short and (rowSlot or not multiSeat) then groupY = math.max(4, math.floor((ah - cardHeight - 20) / 2)) end
     local isWinner = winner == play
     local isTeammate = play.seat % 2 == 1
     local teamCol = isTeammate and palette.teamBlue or palette.teamRed
@@ -614,7 +631,7 @@ C.render = function()
     tag.ZIndex = 20
     corner(tag, 6)
     if isWinner then
-      tag.Text = '★ ' .. tag.Text .. ((portrait and multiSeat) and '' or (live and ' · WINNING' or ' · WON'))
+      tag.Text = '★ ' .. tag.Text .. ((multiSeat and (portrait or rowSlot)) and '' or (live and ' · WINNING' or ' · WON'))
       tag.Font = Enum.Font.GothamBlack
       outline(tag, palette.goldBright, 1.5)
     elseif trick[1] == play then
@@ -622,6 +639,8 @@ C.render = function()
     end
     -- Compact layouts have seat panels over the top edge, so tag below instead.
     tagWidth = math.max(tagWidth, #tag.Text * tag.TextSize * 0.62 + 14)
+    -- In a phone row each tag stays inside its own slot.
+    if rowSlot then tagWidth = math.min(tagWidth, rowSlot - 2); tag.TextTruncate = Enum.TextTruncate.AtEnd end
     local tagY = tagBelow and (groupY + cardHeight + 6) or (groupY - 5 - tagHeight - 2)
     rect(tag, aw * position[1] - tagWidth / 2, tagY, tagWidth, tagHeight)
 
